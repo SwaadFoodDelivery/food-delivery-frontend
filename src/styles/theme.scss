@@ -1,0 +1,25 @@
+:root {
+  --fd-font-family-base: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --fd-font-family-heading: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --fd-radius-sm: 8px;
+  --fd-radius-md: 12px;
+  --fd-radius-lg: 16px;
+  --fd-shadow-soft: 0 10px 30px rgba(17, 24, 39, 0.08);
+}
+
+.v-application {
+  font-family: var(--fd-font-family-base) !important;
+  color: rgb(var(--v-theme-on-background));
+  background: linear-gradient(180deg, #fff8f2 0%, #fffdfb 100%);
+}
+
+.v-application h1,
+.v-application h2,
+.v-application h3,
+.v-application h4,
+.v-application h5,
+.v-application h6 {
+  font-family: var(--fd-font-family-heading);
+  letter-spacing: -0.01em;
+  color: rgb(var(--v-theme-on-background));
+}
