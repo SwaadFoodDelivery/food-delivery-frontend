@@ -3,24 +3,26 @@ export const THEME_NAME = 'foodDeliveryTheme'
 export const appTheme = {
   dark: false,
   colors: {
-    primary: '#E85D04',
-    'primary-darken-1': '#C2410C',
-    secondary: '#2A9D8F',
-    accent: '#FFB703',
-    background: '#FFF8F2',
+    primary: '#0F766E',
+    'primary-darken-1': '#115E59',
+    secondary: '#F97316',
+    accent: '#2563EB',
+    background: '#F6FAF8',
     surface: '#FFFFFF',
-    'surface-variant': '#F3EDE8',
-    success: '#2E7D32',
-    warning: '#ED6C02',
-    error: '#D32F2F',
-    info: '#0288D1',
+    'surface-variant': '#E8F1EE',
+    border: '#D8E2DE',
+    success: '#15803D',
+    warning: '#B45309',
+    error: '#B91C1C',
+    info: '#0369A1',
     'on-primary': '#FFFFFF',
     'on-secondary': '#FFFFFF',
-    'on-background': '#1F2937',
-    'on-surface': '#1F2937'
+    'on-background': '#14211F',
+    'on-surface': '#14211F',
+    'on-surface-variant': '#5B6865'
   },
   variables: {
-    'border-color': '#E5E7EB',
+    'border-color': '#D8E2DE',
     'high-emphasis-opacity': 0.92,
     'medium-emphasis-opacity': 0.72,
     'disabled-opacity': 0.42
@@ -40,7 +42,11 @@ export const appDefaults = {
     style: 'text-transform: none; font-weight: 600; letter-spacing: 0;'
   },
   VCard: {
-    rounded: 'xl',
+    rounded: 'lg',
+    elevation: 0
+  },
+  VSheet: {
+    rounded: 'lg',
     elevation: 0
   },
   VTextField: {
@@ -49,6 +55,9 @@ export const appDefaults = {
     color: 'primary'
   },
   VChip: {
+    rounded: 'lg'
+  },
+  VAlert: {
     rounded: 'lg'
   }
 }
