@@ -1,4 +1,5 @@
 import {
+  isOptionalEmail,
   isValidEmail,
   isValidIndianPhone,
   isValidOtp,
@@ -34,10 +35,18 @@ describe('validators', () => {
   })
 
   describe('isValidEmail', () => {
-    it('allows optional email but validates populated values', () => {
-      expect(isValidEmail('')).toBe(true)
+    it('requires a non-empty valid email address', () => {
+      expect(isValidEmail('')).toBe(false)
       expect(isValidEmail('customer@swaad.test')).toBe(true)
       expect(isValidEmail('invalid-email')).toBe(false)
+    })
+  })
+
+  describe('isOptionalEmail', () => {
+    it('allows empty but validates populated values', () => {
+      expect(isOptionalEmail('')).toBe(true)
+      expect(isOptionalEmail('customer@swaad.test')).toBe(true)
+      expect(isOptionalEmail('invalid-email')).toBe(false)
     })
   })
 

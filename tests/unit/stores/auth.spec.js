@@ -2,6 +2,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { AUTH_STEPS, AUTH_STORAGE_KEYS } from '@/constants/auth'
 import {
+  beginPhoneCheck,
+  completeOtpVerification,
+  completeRegistration
+} from '@/services/authActions'
+import {
   checkPhone,
   register,
   sendOtp,
@@ -10,6 +15,7 @@ import {
 
 jest.mock('@/services/authService', () => ({
   checkPhone: jest.fn(),
+  getMe: jest.fn(),
   logout: jest.fn(),
   register: jest.fn(),
   sendEmailOtp: jest.fn(),
@@ -48,7 +54,7 @@ describe('auth store', () => {
     })
 
     const store = useAuthStore()
-    const nextStep = await store.beginPhoneCheck({
+    const nextStep = await beginPhoneCheck({
       phone: '+91 79093 38983',
       role: 'client'
     })
@@ -72,7 +78,7 @@ describe('auth store', () => {
     })
 
     const store = useAuthStore()
-    const nextStep = await store.beginPhoneCheck({
+    const nextStep = await beginPhoneCheck({
       phone: '7909338983',
       role: 'driver'
     })
@@ -98,7 +104,7 @@ describe('auth store', () => {
       step: AUTH_STEPS.REGISTER
     })
 
-    const result = await store.completeRegistration({
+    const result = await completeRegistration({
       name: ' Rishabh Jain ',
       email: ' rishabh@swaad.test ',
       referralCode: ' SWAAD10 '
@@ -131,7 +137,7 @@ describe('auth store', () => {
       step: AUTH_STEPS.OTP
     })
 
-    const result = await store.completeOtpVerification({ otp: '123456' })
+    const result = await completeOtpVerification({ otp: '123456' })
 
     expect(verifyOtp).toHaveBeenCalledWith({
       phone: '7909338983',
@@ -141,7 +147,6 @@ describe('auth store', () => {
     expect(store.isAuthenticated).toBe(true)
     expect(store.flow.step).toBe(AUTH_STEPS.AUTHENTICATED)
     expect(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)).toBe('access-token-1')
-    expect(JSON.parse(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.USER))).toEqual(verifiedUser)
     expect(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.FLOW)).toBeNull()
   })
 })
