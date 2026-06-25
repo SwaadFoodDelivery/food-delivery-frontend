@@ -7,6 +7,8 @@
   --fd-shadow-soft: 0 10px 30px rgba(17, 24, 39, 0.08);
 }
 
+// ─── Base ────────────────────────────────────────────────────────────────────
+
 .v-application {
   font-family: var(--fd-font-family-base) !important;
   color: rgb(var(--v-theme-on-background));
@@ -26,39 +28,23 @@
   color: rgb(var(--v-theme-on-background));
 }
 
-.auth-page {
-  align-items: center;
-  display: grid;
-  min-height: calc(100vh - 144px);
-}
-
-.auth-page__panel {
-  background: rgb(var(--v-theme-surface));
-  border: 1px solid rgb(var(--v-theme-border));
-  border-radius: var(--fd-radius-lg);
-  box-shadow: var(--fd-shadow-soft);
-  display: grid;
-  gap: 28px;
-  margin: 0 auto;
-  max-width: 520px;
-  padding: clamp(22px, 5vw, 40px);
-  width: min(100%, 520px);
-}
+// ─── Auth page ───────────────────────────────────────────────────────────────
 
 .auth-page__intro {
-  display: grid;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.auth-page__logo,
+.auth-page__logo {
+  border-radius: var(--fd-radius-sm);
+}
+
 .auth-page__icon {
+  align-items: center;
   background: rgba(var(--v-theme-primary), 0.1);
   border-radius: var(--fd-radius-sm);
   color: rgb(var(--v-theme-primary));
-}
-
-.auth-page__icon {
-  align-items: center;
   display: inline-flex;
   font-size: 30px;
   height: 52px;
@@ -74,7 +60,7 @@
   text-transform: uppercase;
 }
 
-.auth-page h1 {
+.auth-page__intro h1 {
   font-size: clamp(1.75rem, 6vw, 2.8rem);
   line-height: 1.04;
   margin: 0;
@@ -82,16 +68,21 @@
 
 .auth-page__subtle {
   color: rgb(var(--v-theme-on-surface-variant));
+  font-size: 0.9rem;
   margin: 0;
 }
 
+// ─── Auth form ───────────────────────────────────────────────────────────────
+
 .auth-form {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
 .auth-form__field {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -99,18 +90,6 @@
   color: rgb(var(--v-theme-on-surface));
   font-size: 0.9rem;
   font-weight: 700;
-}
-
-.auth-role-toggle {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  height: auto !important;
-  width: 100%;
-}
-
-.auth-role-toggle__button {
-  min-height: 44px;
-  width: 100%;
 }
 
 .auth-form__alert {
@@ -131,16 +110,33 @@
   letter-spacing: 0.24em;
 }
 
+// ─── Auth role toggle ─────────────────────────────────────────────────────────
+
+.auth-role-toggle {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  height: auto !important;
+  width: 100%;
+}
+
+.auth-role-toggle__button {
+  min-height: 44px;
+  width: 100%;
+}
+
+// ─── Eyebrow (shared across pages) ───────────────────────────────────────────
+
+.page-eyebrow {
+  color: rgb(var(--v-theme-primary));
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+
+// ─── Responsive ──────────────────────────────────────────────────────────────
+
 @media (max-width: 560px) {
-  .auth-page {
-    align-items: start;
-    min-height: auto;
-  }
-
-  .auth-page__panel {
-    box-shadow: none;
-  }
-
   .auth-role-toggle {
     grid-template-columns: 1fr;
   }

@@ -20,11 +20,12 @@ export const isValidOtp = (value) => new RegExp(`^\\d{${OTP_LENGTH}}$`).test(Str
 
 export const isValidEmail = (value) => {
   const email = String(value || '').trim()
-  if (!email) {
-    return true
-  }
+  return email.length > 0 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
 
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+export const isOptionalEmail = (value) => {
+  const email = String(value || '').trim()
+  return !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
 export const sanitizeOtp = (value) => String(value || '').replace(/\D/g, '').slice(0, OTP_LENGTH)

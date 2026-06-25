@@ -1,8 +1,8 @@
 import axios from 'axios'
 import { API_BASE_URL } from '@/constants/apis'
-import { AUTH_ERROR_CODES } from '@/constants/auth'
 import { getAccessToken, clearAuthSession } from '@/utils/authSession'
 import { getDeviceId } from '@/utils/device'
+import logger from '@/utils/logger'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,13 +13,6 @@ const api = axios.create({
     Accept: 'application/json'
   }
 })
-
-const authFailureCodes = new Set([
-  AUTH_ERROR_CODES.UNAUTHORIZED,
-  AUTH_ERROR_CODES.TOKEN_EXPIRED,
-  AUTH_ERROR_CODES.SESSION_NOT_FOUND,
-  AUTH_ERROR_CODES.SESSION_REVOKED
-])
 
 export class APIError extends Error {
   constructor({ message, code, details, status, data }) {
@@ -41,6 +34,10 @@ export const normalizeAPIError = (error) => {
   const payload = response?.data || {}
   const plainTextPayload = typeof payload === 'string' ? payload : ''
   const isProxyConnectionError = plainTextPayload.includes('Proxy error') || plainTextPayload.includes('ECONNREFUSED')
+
+  if (isProxyConnectionError) {
+    logger.error('Backend unreachable — proxy connection refused', { target: API_BASE_URL })
+  }
 
   return new APIError({
     message: isProxyConnectionError
@@ -67,31 +64,34 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+const rejectAPIError = (apiError, url) => {
+  if (apiError.status === 401) {
+    logger.auth('Session invalid — clearing auth session', { url, code: apiError.code })
+    clearAuthSession()
+  } else {
+    logger.error('API error', { url, code: apiError.code, message: apiError.message, httpStatus: apiError.status })
+  }
+
+  return Promise.reject(apiError)
+}
+
 api.interceptors.response.use(
   (response) => {
     const body = response.data
 
     if (body?.status === 'error') {
-      throw new APIError({
+      return rejectAPIError(new APIError({
         message: body.message || body.data?.message || 'Request failed',
         code: body.error_code || body.code || 'REQUEST_FAILED',
         details: body.details || [],
         status: response.status,
         data: body.data || null
-      })
+      }), response.config?.url)
     }
 
     return response
   },
-  (error) => {
-    const normalized = normalizeAPIError(error)
-
-    if (normalized.status === 401 || authFailureCodes.has(normalized.code)) {
-      clearAuthSession()
-    }
-
-    return Promise.reject(normalized)
-  }
+  (error) => rejectAPIError(normalizeAPIError(error), error.config?.url)
 )
 
 export const request = async (config) => {

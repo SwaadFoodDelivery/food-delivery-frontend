@@ -34,26 +34,6 @@ export const setAccessToken = (token) => {
   }
 }
 
-export const getStoredUser = () => {
-  try {
-    return safeParse(storage().getItem(AUTH_STORAGE_KEYS.USER), null)
-  } catch {
-    return null
-  }
-}
-
-export const setStoredUser = (user) => {
-  try {
-    if (user) {
-      storage().setItem(AUTH_STORAGE_KEYS.USER, JSON.stringify(user))
-    } else {
-      storage().removeItem(AUTH_STORAGE_KEYS.USER)
-    }
-  } catch {
-    // Ignore storage write failures; auth state still lives in memory.
-  }
-}
-
 export const getStoredFlow = () => {
   try {
     return safeParse(storage().getItem(AUTH_STORAGE_KEYS.FLOW), null)
@@ -76,6 +56,5 @@ export const setStoredFlow = (flow) => {
 
 export const clearAuthSession = () => {
   setAccessToken('')
-  setStoredUser(null)
   setStoredFlow(null)
 }

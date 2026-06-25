@@ -1,75 +1,72 @@
 <template>
-  <section class="dashboard">
-    <div class="dashboard__header">
-      <div>
-        <p class="dashboard__eyebrow">Signed in</p>
-        <h1>{{ auth.user?.name || 'Swaad user' }}</h1>
+  <app-layout>
+    <section class="dashboard">
+      <div class="dashboard__header">
+        <div>
+          <p class="page-eyebrow">Signed in</p>
+          <h1>{{ auth.user?.name || 'Swaad user' }}</h1>
+        </div>
       </div>
-      <v-btn color="primary" prepend-icon="mdi-logout" variant="tonal" @click="auth.logout">
-        Logout
-      </v-btn>
-    </div>
 
-    <div class="dashboard__grid">
-      <v-sheet class="dashboard-panel" border>
-        <v-icon class="dashboard-panel__icon" icon="mdi-account-badge-outline" />
-        <h2>Account</h2>
-        <dl>
-          <div>
-            <dt>Role</dt>
-            <dd>{{ roleLabel }}</dd>
-          </div>
-          <div>
-            <dt>Phone</dt>
-            <dd>{{ auth.user?.phone }}</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>{{ auth.user?.account_status }}</dd>
-          </div>
-        </dl>
-      </v-sheet>
+      <div class="dashboard__grid">
+        <v-sheet class="dashboard-panel" border>
+          <v-icon class="dashboard-panel__icon" icon="mdi-account-badge-outline" />
+          <h2>Account</h2>
+          <dl>
+            <div>
+              <dt>Role</dt>
+              <dd>{{ roleLabel }}</dd>
+            </div>
+            <div>
+              <dt>Phone</dt>
+              <dd>{{ auth.user?.phone }}</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd>{{ auth.user?.account_status }}</dd>
+            </div>
+          </dl>
+        </v-sheet>
 
-      <v-sheet class="dashboard-panel" border>
-        <v-icon class="dashboard-panel__icon" icon="mdi-shield-check-outline" />
-        <h2>Verification</h2>
-        <dl>
-          <div>
-            <dt>Phone</dt>
-            <dd>{{ auth.user?.phone_verified ? 'Verified' : 'Pending' }}</dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>{{ emailStatus }}</dd>
-          </div>
-        </dl>
-        <v-btn
-          v-if="auth.needsEmailVerification"
-          class="dashboard-panel__action"
-          color="warning"
-          :to="{ name: 'auth-email' }"
-          prepend-icon="mdi-email-check-outline"
-        >
-          Verify email
-        </v-btn>
-      </v-sheet>
-    </div>
-  </section>
+        <v-sheet class="dashboard-panel" border>
+          <v-icon class="dashboard-panel__icon" icon="mdi-shield-check-outline" />
+          <h2>Verification</h2>
+          <dl>
+            <div>
+              <dt>Phone</dt>
+              <dd>{{ auth.user?.phone_verified ? 'Verified' : 'Pending' }}</dd>
+            </div>
+            <div>
+              <dt>Email</dt>
+              <dd>{{ emailStatus }}</dd>
+            </div>
+          </dl>
+          <v-btn
+            v-if="auth.needsEmailVerification"
+            class="dashboard-panel__action"
+            color="warning"
+            :to="{ name: 'auth-email' }"
+            prepend-icon="mdi-email-check-outline"
+          >
+            Verify email
+          </v-btn>
+        </v-sheet>
+      </div>
+    </section>
+  </app-layout>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { AUTH_ROLES } from '@/constants/auth'
 import { useAuthStore } from '@/stores/auth'
+import AppLayout from '@/components/layouts/AppLayout.vue'
 
 const auth = useAuthStore()
 
 const roleLabel = computed(() => AUTH_ROLES.find((role) => role.value === auth.user?.role)?.label || auth.user?.role)
 const emailStatus = computed(() => {
-  if (!auth.user?.email) {
-    return 'Not added'
-  }
-
+  if (!auth.user?.email) return 'Not added'
   return auth.user.email_verified ? 'Verified' : 'Pending'
 })
 </script>
@@ -85,14 +82,6 @@ const emailStatus = computed(() => {
   display: flex;
   gap: 16px;
   justify-content: space-between;
-}
-
-.dashboard__eyebrow {
-  color: rgb(var(--v-theme-primary));
-  font-size: 0.8rem;
-  font-weight: 800;
-  margin: 0 0 6px;
-  text-transform: uppercase;
 }
 
 .dashboard h1 {

@@ -57,3 +57,8 @@ export const logout = () => request({
   method: 'post',
   url: API_URLS.AUTH_LOGOUT
 })
+
+export const getMe = () => request({
+  method: 'get',
+  url: API_URLS.ME
+})

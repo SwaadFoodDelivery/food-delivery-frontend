@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import logger from '@/utils/logger'
 
 const routes = [
   {
@@ -52,6 +53,7 @@ router.beforeEach((to) => {
   const auth = useAuthStore()
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    logger.auth('Unauthenticated access blocked — redirecting to login', { attempted: to.fullPath })
     return {
       name: 'auth-login',
       query: { redirect: to.fullPath }
@@ -59,14 +61,17 @@ router.beforeEach((to) => {
   }
 
   if (to.meta.guestOnly && auth.isAuthenticated) {
+    logger.auth('Authenticated user redirected away from guest route', { route: to.name })
     return { name: 'dashboard' }
   }
 
   if (to.meta.requiresAuthFlow === 'register' && auth.flow.step !== 'register') {
+    logger.warn('Register route accessed without valid auth flow — redirecting', { route: to.name })
     return { name: 'auth-login', query: to.query }
   }
 
   if (to.meta.requiresPendingPhone && !auth.flow.phone) {
+    logger.warn('OTP route accessed without pending phone — redirecting', { route: to.name })
     return { name: 'auth-login', query: to.query }
   }
 

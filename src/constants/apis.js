@@ -1,4 +1,4 @@
-export const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || '/api/v1'
+export const API_BASE_URL = process.env.VUE_APP_API_BASE_URL || '/api'
 
 export const API_URLS = {
   AUTH_CHECK_PHONE: '/auth/check-phone',
