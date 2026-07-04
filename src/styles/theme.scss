@@ -2,15 +2,19 @@
   --fd-font-family-base: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --fd-font-family-heading: "Plus Jakarta Sans", "Avenir Next", "Segoe UI", sans-serif;
   --fd-radius-sm: 8px;
-  --fd-radius-md: 12px;
-  --fd-radius-lg: 16px;
+  --fd-radius-md: 8px;
+  --fd-radius-lg: 8px;
   --fd-shadow-soft: 0 10px 30px rgba(17, 24, 39, 0.08);
 }
+
+// ─── Base ────────────────────────────────────────────────────────────────────
 
 .v-application {
   font-family: var(--fd-font-family-base) !important;
   color: rgb(var(--v-theme-on-background));
-  background: linear-gradient(180deg, #fff8f2 0%, #fffdfb 100%);
+  background:
+    linear-gradient(180deg, rgba(15, 118, 110, 0.06) 0%, rgba(246, 250, 248, 0) 38%),
+    rgb(var(--v-theme-background));
 }
 
 .v-application h1,
@@ -20,6 +24,17 @@
 .v-application h5,
 .v-application h6 {
   font-family: var(--fd-font-family-heading);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   color: rgb(var(--v-theme-on-background));
 }
+
+// ─── Eyebrow (shared across pages) ───────────────────────────────────────────
+
+.page-eyebrow {
+  color: rgb(var(--v-theme-primary));
+  font-size: 0.8rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+  text-transform: uppercase;
+}
+

@@ -5,7 +5,8 @@ node_modules
 /.vscode
 
 
-# local env files
+# env files — ignore real env, keep sample
+.env
 .env.local
 .env.*.local
 

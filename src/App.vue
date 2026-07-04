@@ -1,21 +1,35 @@
 <template>
-  <v-app>
-    <v-app-bar color="primary" density="comfortable">
-      <v-app-bar-title>Food Delivery</v-app-bar-title>
-      <v-btn to="/" variant="text">Home</v-btn>
-      <v-btn to="/about" variant="text">About</v-btn>
-    </v-app-bar>
+  <v-app v-if="auth.ready">
+    <router-view />
+  </v-app>
 
+  <v-app v-else>
     <v-main>
-      <v-container class="py-8">
-        <router-view />
-      </v-container>
+      <div class="app-loading">
+        <v-progress-circular color="primary" indeterminate size="48" />
+      </div>
     </v-main>
   </v-app>
 </template>
 
-<script>
-export default {
-  name: 'App'
-}
+<script setup>
+import { onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { fetchMe } from '@/services/authActions'
+
+const auth = useAuthStore()
+
+onMounted(async () => {
+  await fetchMe()
+  auth.setReady()
+})
 </script>
+
+<style scoped>
+.app-loading {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+</style>
