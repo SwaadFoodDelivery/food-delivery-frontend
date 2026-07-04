@@ -96,7 +96,7 @@ api.interceptors.response.use(
 
 export const request = async (config) => {
   const response = await api(config)
-  return response.data?.data ?? response.data
+  return response.data
 }
 
 export default api

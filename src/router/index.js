@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import logger from '@/utils/logger'
 
@@ -12,18 +13,6 @@ const routes = [
     name: 'auth-login',
     component: () => import('@/views/auth/AuthLoginView.vue'),
     meta: { guestOnly: true }
-  },
-  {
-    path: '/auth/register',
-    name: 'auth-register',
-    component: () => import('@/views/auth/AuthRegisterView.vue'),
-    meta: { guestOnly: true, requiresAuthFlow: 'register' }
-  },
-  {
-    path: '/auth/verify',
-    name: 'auth-otp',
-    component: () => import('@/views/auth/AuthOtpView.vue'),
-    meta: { guestOnly: true, requiresPendingPhone: true }
   },
   {
     path: '/auth/verify-email',
@@ -49,8 +38,17 @@ const router = createRouter({
   routes
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
+  if (!auth.ready) {
+    await new Promise((resolve) => {
+      if (auth.ready) { resolve(); return }
+      const unwatch = watch(() => auth.ready, (ready) => {
+        if (ready) { unwatch(); resolve() }
+      })
+    })
+  }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     logger.auth('Unauthenticated access blocked — redirecting to login', { attempted: to.fullPath })
@@ -63,16 +61,6 @@ router.beforeEach((to) => {
   if (to.meta.guestOnly && auth.isAuthenticated) {
     logger.auth('Authenticated user redirected away from guest route', { route: to.name })
     return { name: 'dashboard' }
-  }
-
-  if (to.meta.requiresAuthFlow === 'register' && auth.flow.step !== 'register') {
-    logger.warn('Register route accessed without valid auth flow — redirecting', { route: to.name })
-    return { name: 'auth-login', query: to.query }
-  }
-
-  if (to.meta.requiresPendingPhone && !auth.flow.phone) {
-    logger.warn('OTP route accessed without pending phone — redirecting', { route: to.name })
-    return { name: 'auth-login', query: to.query }
   }
 
   return true

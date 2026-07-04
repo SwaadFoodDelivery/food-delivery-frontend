@@ -1,17 +1,23 @@
 <template>
-  <app-layout>
-    <section class="not-found">
-      <v-icon icon="mdi-map-marker-question-outline" />
-      <h1>Page not found</h1>
-      <v-btn color="primary" :to="{ name: 'dashboard' }" prepend-icon="mdi-home-outline">
-        Go home
-      </v-btn>
-    </section>
-  </app-layout>
+  <v-app>
+    <v-main>
+      <section class="not-found">
+        <v-icon icon="mdi-map-marker-question-outline" />
+        <h1>Page not found</h1>
+        <v-btn color="primary" :to="homeRoute" prepend-icon="mdi-home-outline">
+          Go home
+        </v-btn>
+      </section>
+    </v-main>
+  </v-app>
 </template>
 
 <script setup>
-import AppLayout from '@/components/layouts/AppLayout.vue'
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const homeRoute = computed(() => auth.isAuthenticated ? { name: 'dashboard' } : { name: 'auth-login' })
 </script>
 
 <style scoped>
@@ -20,7 +26,7 @@ import AppLayout from '@/components/layouts/AppLayout.vue'
   display: grid;
   gap: 18px;
   justify-items: center;
-  min-height: 60vh;
+  min-height: 100vh;
   text-align: center;
 }
 

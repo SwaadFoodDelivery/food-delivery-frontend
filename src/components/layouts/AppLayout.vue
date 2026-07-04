@@ -19,7 +19,7 @@
         <v-btn :to="{ name: 'dashboard' }" prepend-icon="mdi-view-dashboard-outline" variant="text">
           Dashboard
         </v-btn>
-        <v-btn prepend-icon="mdi-logout" variant="text" @click="logout">
+        <v-btn prepend-icon="mdi-logout" variant="text" :loading="loggingOut" @click="handleLogout">
           Logout
         </v-btn>
       </template>
@@ -34,11 +34,22 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import logo from '@/assets/images/logo.png'
 import { useAuthStore } from '@/stores/auth'
 import { logout } from '@/services/authActions'
 
 const auth = useAuthStore()
+const router = useRouter()
+const loggingOut = ref(false)
+
+const handleLogout = async () => {
+  loggingOut.value = true
+  await logout()
+  loggingOut.value = false
+  router.replace({ name: 'auth-login' })
+}
 </script>
 
 <style scoped>

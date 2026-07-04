@@ -1,125 +1,167 @@
 <template>
   <auth-layout>
-    <div class="auth-page__intro">
-      <v-img :src="logo" alt="" class="auth-page__logo" width="52" height="52" />
-      <p class="auth-page__eyebrow">Secure sign in</p>
-      <h1>Continue with your mobile number</h1>
-    </div>
+    <phone-step
+      v-if="step === 'phone'"
+      :loading="loading"
+      :error="error"
+      @done="handlePhone"
+    />
 
-    <v-form class="auth-form" @submit.prevent="submit">
-      <div class="auth-form__field">
-        <label class="auth-form__label" for="role">Account type</label>
-        <v-btn-toggle
-          id="role"
-          v-model="form.role"
-          class="auth-role-toggle"
-          color="primary"
-          divided
-          mandatory
-          variant="outlined"
-        >
-          <v-btn
-            v-for="role in AUTH_ROLES"
-            :key="role.value"
-            :value="role.value"
-            class="auth-role-toggle__button"
-          >
-            {{ role.label }}
-          </v-btn>
-        </v-btn-toggle>
-      </div>
+    <register-step
+      v-else-if="step === 'register'"
+      :display-phone="phone"
+      :loading="loading"
+      :error="error"
+      @done="handleRegister"
+      @back="goBack"
+    />
 
-      <v-text-field
-        v-model.trim="form.phone"
-        autocomplete="tel"
-        autofocus
-        inputmode="tel"
-        label="Mobile number"
-        maxlength="16"
-        prepend-inner-icon="mdi-cellphone"
-        :error-messages="phoneError"
-        @blur="touchPhone = true"
-      />
-
-      <v-alert
-        v-if="displayError"
-        border="start"
-        class="auth-form__alert"
-        density="comfortable"
-        type="error"
-        variant="tonal"
-      >
-        {{ displayError }}
-      </v-alert>
-
-      <v-alert
-        v-else-if="auth.notice"
-        border="start"
-        class="auth-form__alert"
-        density="comfortable"
-        type="success"
-        variant="tonal"
-      >
-        {{ auth.notice }}
-      </v-alert>
-
-      <v-btn
-        block
-        color="primary"
-        :disabled="!canSubmit"
-        :loading="auth.loading"
-        prepend-icon="mdi-shield-key-outline"
-        size="large"
-        type="submit"
-      >
-        Continue
-      </v-btn>
-    </v-form>
+    <otp-step
+      v-else-if="step === 'otp'"
+      :masked-phone="maskedPhone"
+      :otp-expires-at="otpExpiresAt"
+      :resend-available-at="resendAvailableAt"
+      :loading="loading"
+      :error="error"
+      :notice="notice"
+      @done="handleOtp"
+      @back="goBack"
+      @resend="handleResend"
+    />
   </auth-layout>
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import logo from '@/assets/images/logo.png'
-import { AUTH_ROLES, AUTH_STEPS } from '@/constants/auth'
 import { useAuthStore } from '@/stores/auth'
-import { beginPhoneCheck } from '@/services/authActions'
-import { isValidIndianPhone } from '@/utils/validators'
+import { RESEND_COOLDOWN_SECONDS } from '@/constants/auth'
+import {
+  checkPhone,
+  register,
+  sendOtp,
+  verifyOtp
+} from '@/services/authService'
+import { setAccessToken } from '@/utils/authSession'
+import { normalizeIndianPhone } from '@/utils/validators'
+import { redirectAfterAuth } from '@/utils/authHelpers'
 import AuthLayout from '@/components/layouts/AuthLayout.vue'
+import PhoneStep from '@/components/auth/PhoneStep.vue'
+import RegisterStep from '@/components/auth/RegisterStep.vue'
+import OtpStep from '@/components/auth/OtpStep.vue'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const form = reactive({
-  phone: auth.flow.phone || '',
-  role: auth.flow.role || 'client'
-})
-const localError = ref('')
-const touchPhone = ref(false)
+// --- local wizard state ---
+const step = ref('phone')
+const phone = ref('')
+const role = ref('client')
+const isNewUser = ref(false)
+const maskedPhone = ref('')
+const otpExpiresAt = ref('')
+const resendAvailableAt = ref(0)
 
-const phoneError = computed(() => {
-  if (!touchPhone.value || !form.phone) return ''
-  return isValidIndianPhone(form.phone) ? '' : 'Enter a valid Indian mobile number'
-})
-const displayError = computed(() => localError.value || auth.error)
-const canSubmit = computed(() => isValidIndianPhone(form.phone) && Boolean(form.role) && !auth.loading)
+const loading = ref(false)
+const error = ref('')
+const notice = ref('')
 
-const submit = async () => {
-  localError.value = ''
-  touchPhone.value = true
+const setError = (msg) => { error.value = msg; notice.value = '' }
+const setNotice = (msg) => { notice.value = msg; error.value = '' }
+const clearMessages = () => { error.value = ''; notice.value = '' }
+
+// --- step handlers ---
+
+const handlePhone = async ({ phone: rawPhone, role: selectedRole }) => {
+  clearMessages()
+  loading.value = true
 
   try {
-    const nextStep = await beginPhoneCheck(form)
-    if (nextStep === AUTH_STEPS.REGISTER) {
-      await router.push({ name: 'auth-register', query: route.query })
-      return
+    const normalizedPhone = normalizeIndianPhone(rawPhone)
+    phone.value = normalizedPhone
+    role.value = selectedRole
+
+    const result = await checkPhone({ phone: normalizedPhone, role: selectedRole })
+
+    if (result.data?.registered) {
+      const otp = await sendOtp({ phone: normalizedPhone })
+      isNewUser.value = false
+      maskedPhone.value = otp.data?.masked_phone || result.data?.masked_phone || ''
+      otpExpiresAt.value = otp.data?.otp_expires_at || ''
+      resendAvailableAt.value = Date.now() + RESEND_COOLDOWN_SECONDS * 1000
+      setNotice(otp.message || otp.data?.message || 'OTP sent')
+      step.value = 'otp'
+    } else {
+      isNewUser.value = true
+      setNotice(result.message || result.data?.message || 'Create your account')
+      step.value = 'register'
     }
-    await router.push({ name: 'auth-otp', query: route.query })
-  } catch (error) {
-    localError.value = error.message || 'Unable to continue'
+  } catch (err) {
+    setError(err.message || 'Unable to continue')
+  } finally {
+    loading.value = false
   }
 }
-</script>
 
+const handleRegister = async ({ name, email, referralCode }) => {
+  clearMessages()
+  loading.value = true
+
+  try {
+    const result = await register({ phone: phone.value, name, email, referralCode, role: role.value })
+    maskedPhone.value = result.data?.masked_phone || ''
+    otpExpiresAt.value = result.data?.otp_expires_at || ''
+    resendAvailableAt.value = Date.now() + RESEND_COOLDOWN_SECONDS * 1000
+    setNotice(result.message || result.data?.message || 'OTP sent')
+    step.value = 'otp'
+  } catch (err) {
+    setError(err.message || 'Unable to create account')
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleOtp = async ({ otp }) => {
+  clearMessages()
+  loading.value = true
+
+  try {
+    const result = await verifyOtp({ phone: phone.value, otp })
+    auth.setAccessToken(result.data?.access_token || '')
+    auth.setUser(result.data?.user || null)
+    setAccessToken(result.data?.access_token || '')
+
+    const target = auth.needsEmailVerification
+      ? { name: 'auth-email' }
+      : redirectAfterAuth(route)
+    await router.replace(target)
+  } catch (err) {
+    setError(err.message || 'Unable to verify OTP')
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleResend = async () => {
+  clearMessages()
+  loading.value = true
+
+  try {
+    const result = await sendOtp({ phone: phone.value })
+    maskedPhone.value = result.data?.masked_phone || maskedPhone.value
+    otpExpiresAt.value = result.data?.otp_expires_at || ''
+    resendAvailableAt.value = Date.now() + RESEND_COOLDOWN_SECONDS * 1000
+    setNotice(result.message || result.data?.message || 'OTP sent')
+  } catch (err) {
+    setError(err.message || 'Unable to resend OTP')
+  } finally {
+    loading.value = false
+  }
+}
+
+const goBack = () => {
+  clearMessages()
+  step.value = step.value === 'otp' && isNewUser.value ? 'register' : 'phone'
+}
+</script>

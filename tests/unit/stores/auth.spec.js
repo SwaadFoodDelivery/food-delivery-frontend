@@ -1,17 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
-import { AUTH_STEPS, AUTH_STORAGE_KEYS } from '@/constants/auth'
-import {
-  beginPhoneCheck,
-  completeOtpVerification,
-  completeRegistration
-} from '@/services/authActions'
-import {
-  checkPhone,
-  register,
-  sendOtp,
-  verifyOtp
-} from '@/services/authService'
+import { AUTH_STORAGE_KEYS } from '@/constants/auth'
+import { fetchMe, logout } from '@/services/authActions'
+import { getMe, logout as logoutRequest } from '@/services/authService'
 
 jest.mock('@/services/authService', () => ({
   checkPhone: jest.fn(),
@@ -42,111 +33,77 @@ describe('auth store', () => {
     setActivePinia(createPinia())
   })
 
-  it('moves registered users from phone check to OTP with backend-safe payloads', async () => {
-    checkPhone.mockResolvedValue({
-      registered: true,
-      masked_phone: '+91 ******8983'
-    })
-    sendOtp.mockResolvedValue({
-      masked_phone: '+91 ******8983',
-      otp_expires_at: '2026-06-11T13:30:00.000Z',
-      message: 'OTP sent'
-    })
-
+  it('isAuthenticated is false when token or user is missing', () => {
     const store = useAuthStore()
-    const nextStep = await beginPhoneCheck({
-      phone: '+91 79093 38983',
-      role: 'client'
-    })
+    expect(store.isAuthenticated).toBe(false)
 
-    expect(nextStep).toBe(AUTH_STEPS.OTP)
-    expect(checkPhone).toHaveBeenCalledWith({
-      phone: '7909338983',
-      role: 'client'
-    })
-    expect(sendOtp).toHaveBeenCalledWith({ phone: '7909338983' })
-    expect(store.flow.phone).toBe('7909338983')
-    expect(store.flow.step).toBe(AUTH_STEPS.OTP)
-    expect(store.flow.registered).toBe(true)
-    expect(store.notice).toBe('OTP sent')
+    store.setAccessToken('tok')
+    expect(store.isAuthenticated).toBe(false)
+
+    store.setAccessToken('')
+    store.setUser(verifiedUser)
+    expect(store.isAuthenticated).toBe(false)
   })
 
-  it('moves unregistered users to the registration step without sending OTP', async () => {
-    checkPhone.mockResolvedValue({
-      registered: false,
-      message: 'Create your account'
-    })
-
+  it('isAuthenticated is true when both token and user are set', () => {
     const store = useAuthStore()
-    const nextStep = await beginPhoneCheck({
-      phone: '7909338983',
-      role: 'driver'
-    })
-
-    expect(nextStep).toBe(AUTH_STEPS.REGISTER)
-    expect(sendOtp).not.toHaveBeenCalled()
-    expect(store.flow.step).toBe(AUTH_STEPS.REGISTER)
-    expect(store.flow.role).toBe('driver')
-    expect(store.flow.registered).toBe(false)
-  })
-
-  it('registers a new user and starts OTP verification', async () => {
-    register.mockResolvedValue({
-      masked_phone: '+91 ******8983',
-      otp_expires_at: '2026-06-11T13:30:00.000Z',
-      message: 'OTP sent'
-    })
-
-    const store = useAuthStore()
-    store.setFlow({
-      phone: '7909338983',
-      role: 'restaurant_owner',
-      step: AUTH_STEPS.REGISTER
-    })
-
-    const result = await completeRegistration({
-      name: ' Rishabh Jain ',
-      email: ' rishabh@swaad.test ',
-      referralCode: ' SWAAD10 '
-    })
-
-    expect(register).toHaveBeenCalledWith({
-      phone: '7909338983',
-      name: ' Rishabh Jain ',
-      email: ' rishabh@swaad.test ',
-      referralCode: ' SWAAD10 ',
-      role: 'restaurant_owner'
-    })
-    expect(result.message).toBe('OTP sent')
-    expect(store.flow.step).toBe(AUTH_STEPS.OTP)
-    expect(store.flow.name).toBe('Rishabh Jain')
-    expect(store.flow.email).toBe('rishabh@swaad.test')
-    expect(store.flow.referralCode).toBe('SWAAD10')
-  })
-
-  it('stores the verified session after successful OTP verification', async () => {
-    verifyOtp.mockResolvedValue({
-      access_token: 'access-token-1',
-      user: verifiedUser
-    })
-
-    const store = useAuthStore()
-    store.setFlow({
-      phone: '7909338983',
-      role: 'client',
-      step: AUTH_STEPS.OTP
-    })
-
-    const result = await completeOtpVerification({ otp: '123456' })
-
-    expect(verifyOtp).toHaveBeenCalledWith({
-      phone: '7909338983',
-      otp: '123456'
-    })
-    expect(result.user).toEqual(verifiedUser)
+    store.setAccessToken('tok')
+    store.setUser(verifiedUser)
     expect(store.isAuthenticated).toBe(true)
-    expect(store.flow.step).toBe(AUTH_STEPS.AUTHENTICATED)
-    expect(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)).toBe('access-token-1')
-    expect(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.FLOW)).toBeNull()
+  })
+
+  it('needsEmailVerification is true when authenticated and email not verified', () => {
+    const store = useAuthStore()
+    store.setAccessToken('tok')
+    store.setUser({ ...verifiedUser, email_verified: false })
+    expect(store.needsEmailVerification).toBe(true)
+  })
+
+  it('needsEmailVerification is false when email is verified', () => {
+    const store = useAuthStore()
+    store.setAccessToken('tok')
+    store.setUser({ ...verifiedUser, email_verified: true })
+    expect(store.needsEmailVerification).toBe(false)
+  })
+
+  it('fetchMe restores session from a valid stored token', async () => {
+    window.sessionStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, 'stored-token')
+    getMe.mockResolvedValue({ status: 'success', data: { user: verifiedUser } })
+
+    setActivePinia(createPinia())
+    const store = useAuthStore()
+
+    await fetchMe()
+
+    expect(getMe).toHaveBeenCalled()
+    expect(store.user).toEqual(verifiedUser)
+  })
+
+  it('fetchMe clears session when stored token is invalid', async () => {
+    window.sessionStorage.setItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN, 'bad-token')
+    getMe.mockRejectedValue(new Error('Unauthorized'))
+
+    setActivePinia(createPinia())
+    const store = useAuthStore()
+
+    await fetchMe()
+
+    expect(store.accessToken).toBe('')
+    expect(store.user).toBeNull()
+    expect(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)).toBeNull()
+  })
+
+  it('logout clears token and user regardless of network outcome', async () => {
+    logoutRequest.mockRejectedValue(new Error('Network error'))
+
+    const store = useAuthStore()
+    store.setAccessToken('tok')
+    store.setUser(verifiedUser)
+
+    await logout()
+
+    expect(store.accessToken).toBe('')
+    expect(store.user).toBeNull()
+    expect(window.sessionStorage.getItem(AUTH_STORAGE_KEYS.ACCESS_TOKEN)).toBeNull()
   })
 })

@@ -17,7 +17,7 @@
         prepend-icon="mdi-email-fast-outline"
         size="large"
         variant="tonal"
-        @click="sendEmailOtp"
+        @click="handleSendOtp"
       >
         Send email OTP
       </v-btn>
@@ -35,32 +35,32 @@
       />
 
       <v-alert
-        v-if="displayError"
+        v-if="error"
         border="start"
         class="auth-form__alert"
         density="comfortable"
         type="error"
         variant="tonal"
       >
-        {{ displayError }}
+        {{ error }}
       </v-alert>
 
       <v-alert
-        v-else-if="auth.notice"
+        v-else-if="notice"
         border="start"
         class="auth-form__alert"
         density="comfortable"
         type="success"
         variant="tonal"
       >
-        {{ auth.notice }}
+        {{ notice }}
       </v-alert>
 
       <v-btn
         block
         color="primary"
         :disabled="!canSubmit"
-        :loading="auth.loading && !sending"
+        :loading="verifying"
         prepend-icon="mdi-check-decagram-outline"
         size="large"
         type="submit"
@@ -88,15 +88,16 @@ const auth = useAuthStore()
 
 const otp = ref('')
 const touchOtp = ref(false)
-const localError = ref('')
 const sending = ref(false)
+const verifying = ref(false)
+const error = ref('')
+const notice = ref('')
 
 const otpError = computed(() => {
   if (!touchOtp.value || !otp.value) return ''
   return isValidOtp(otp.value) ? '' : 'Enter the 6 digit OTP'
 })
-const displayError = computed(() => localError.value || auth.error)
-const canSubmit = computed(() => isValidOtp(otp.value) && !auth.loading)
+const canSubmit = computed(() => isValidOtp(otp.value) && !verifying.value)
 
 onMounted(() => {
   if (!auth.needsEmailVerification) {
@@ -104,29 +105,34 @@ onMounted(() => {
   }
 })
 
-const sendEmailOtp = async () => {
-  localError.value = ''
+const handleSendOtp = async () => {
+  error.value = ''
+  notice.value = ''
   sending.value = true
 
   try {
-    await requestEmailOtp()
-  } catch (error) {
-    localError.value = error.message || 'Unable to send email OTP'
+    const result = await requestEmailOtp()
+    notice.value = result.message || result.data?.message || 'OTP sent'
+  } catch (err) {
+    error.value = err.message || 'Unable to send email OTP'
   } finally {
     sending.value = false
   }
 }
 
 const submit = async () => {
-  localError.value = ''
+  error.value = ''
   touchOtp.value = true
 
   try {
-    await completeEmailVerification({ otp: otp.value })
+    verifying.value = true
+    const result = await completeEmailVerification({ otp: otp.value })
+    notice.value = result.message || result.data?.message || 'Email verified'
     await router.replace({ name: 'dashboard' })
-  } catch (error) {
-    localError.value = error.message || 'Unable to verify email'
+  } catch (err) {
+    error.value = err.message || 'Unable to verify email'
+  } finally {
+    verifying.value = false
   }
 }
 </script>
-

@@ -4,17 +4,8 @@ export const AUTH_ROLES = [
   { label: 'Driver', value: 'driver' }
 ]
 
-export const AUTH_STEPS = {
-  PHONE: 'phone',
-  REGISTER: 'register',
-  OTP: 'otp',
-  EMAIL: 'email',
-  AUTHENTICATED: 'authenticated'
-}
-
 export const AUTH_STORAGE_KEYS = {
   ACCESS_TOKEN: 'fd.access_token',
-  FLOW: 'fd.auth_flow',
   DEVICE_ID: 'fd.device_id'
 }
 

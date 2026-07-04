@@ -1,5 +1,5 @@
 <template>
-  <auth-layout>
+  <div>
     <div class="auth-page__intro">
       <v-icon class="auth-page__icon" icon="mdi-account-plus-outline" />
       <p class="auth-page__eyebrow">New account</p>
@@ -8,14 +8,14 @@
 
     <v-form class="auth-form" @submit.prevent="submit">
       <v-text-field
-        :model-value="auth.flow.phone"
+        :model-value="displayPhone"
         label="Mobile number"
         prepend-inner-icon="mdi-cellphone-lock"
         readonly
       />
 
       <v-text-field
-        v-model.trim="form.name"
+        v-model.trim="name"
         autocomplete="name"
         label="Full name"
         maxlength="100"
@@ -25,7 +25,7 @@
       />
 
       <v-text-field
-        v-model.trim="form.email"
+        v-model.trim="email"
         autocomplete="email"
         label="Email"
         maxlength="255"
@@ -35,7 +35,7 @@
       />
 
       <v-text-field
-        v-model.trim="form.referralCode"
+        v-model.trim="referralCode"
         autocomplete="off"
         label="Referral code"
         maxlength="20"
@@ -43,21 +43,21 @@
       />
 
       <v-alert
-        v-if="displayError"
+        v-if="error"
         border="start"
         class="auth-form__alert"
         density="comfortable"
         type="error"
         variant="tonal"
       >
-        {{ displayError }}
+        {{ error }}
       </v-alert>
 
       <v-btn
         block
         color="primary"
         :disabled="!canSubmit"
-        :loading="auth.loading"
+        :loading="loading"
         prepend-icon="mdi-send-check-outline"
         size="large"
         type="submit"
@@ -65,62 +65,45 @@
         Send OTP
       </v-btn>
 
-      <v-btn block :to="{ name: 'auth-login' }" prepend-icon="mdi-arrow-left" variant="text">
+      <v-btn block prepend-icon="mdi-arrow-left" variant="text" @click="emit('back')">
         Back
       </v-btn>
     </v-form>
-  </auth-layout>
+  </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { completeRegistration } from '@/services/authActions'
+import { computed, ref } from 'vue'
 import { isValidEmail } from '@/utils/validators'
-import AuthLayout from '@/components/layouts/AuthLayout.vue'
 
-const router = useRouter()
-const route = useRoute()
-const auth = useAuthStore()
-
-const form = reactive({
-  name: auth.flow.name || '',
-  email: auth.flow.email || '',
-  referralCode: auth.flow.referralCode || ''
+const props = defineProps({
+  displayPhone: { type: String, default: '' },
+  loading: { type: Boolean, default: false },
+  error: { type: String, default: '' }
 })
-const localError = ref('')
+
+const emit = defineEmits(['done', 'back'])
+
+const name = ref('')
+const email = ref('')
+const referralCode = ref('')
 const touchName = ref(false)
 const touchEmail = ref(false)
 
 const nameError = computed(() => {
   if (!touchName.value) return ''
-  return form.name.trim() ? '' : 'Enter your name'
+  return name.value.trim() ? '' : 'Enter your name'
 })
 const emailError = computed(() => {
-  if (!touchEmail.value || !form.email) return ''
-  return isValidEmail(form.email) ? '' : 'Enter a valid email'
+  if (!touchEmail.value || !email.value) return ''
+  return isValidEmail(email.value) ? '' : 'Enter a valid email'
 })
-const displayError = computed(() => localError.value || auth.error)
-const canSubmit = computed(() => form.name.trim() && isValidEmail(form.email) && !auth.loading)
+const canSubmit = computed(() => name.value.trim() && isValidEmail(email.value) && !props.loading)
 
-onMounted(() => {
-  if (!auth.flow.phone) {
-    router.replace({ name: 'auth-login', query: route.query })
-  }
-})
-
-const submit = async () => {
-  localError.value = ''
+const submit = () => {
   touchName.value = true
   touchEmail.value = true
-
-  try {
-    await completeRegistration(form)
-    await router.push({ name: 'auth-otp', query: route.query })
-  } catch (error) {
-    localError.value = error.message || 'Unable to create account'
-  }
+  if (!canSubmit.value) return
+  emit('done', { name: name.value, email: email.value, referralCode: referralCode.value })
 }
 </script>
-
