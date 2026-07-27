@@ -7,6 +7,14 @@ import { ERROR_CODES } from '@/constants/auth'
 
 jest.mock('@/utils/device', () => ({ getDeviceId: () => 'device-123' }))
 jest.mock('@/utils/logger', () => ({ auth: jest.fn(), error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
+// CLIENT_API_KEY reads process.env.VUE_APP_CLIENT_API_KEY at module load —
+// only set locally via .env (gitignored, absent in CI). Force a fixed value
+// so this test is deterministic in both places, rather than silently
+// asserting on whatever happens to be in the environment it runs in.
+jest.mock('@/constants/common', () => ({
+  ...jest.requireActual('@/constants/common'),
+  CLIENT_API_KEY: 'test-api-key'
+}))
 
 describe('services/api', () => {
   let mock
@@ -42,7 +50,7 @@ describe('services/api', () => {
   describe('auth mode header injection', () => {
     it('AUTH_MODE.API_KEY sends X-API-Key', async () => {
       mock.onPost(API_URLS.INIT_SESSION).reply((config) => {
-        expect(config.headers[HTTP_HEADERS.API_KEY]).toBeTruthy()
+        expect(config.headers[HTTP_HEADERS.API_KEY]).toBe('test-api-key')
         expect(config.headers[HTTP_HEADERS.GUEST_TOKEN]).toBeUndefined()
         expect(config.headers[HTTP_HEADERS.AUTHORIZATION]).toBeUndefined()
         return [200, { status: 'success', data: {} }]
