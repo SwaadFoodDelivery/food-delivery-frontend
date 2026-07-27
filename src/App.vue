@@ -1,21 +1,9 @@
 <template>
   <v-app>
-    <v-app-bar color="primary" density="comfortable">
-      <v-app-bar-title>Food Delivery</v-app-bar-title>
-      <v-btn to="/" variant="text">Home</v-btn>
-      <v-btn to="/about" variant="text">About</v-btn>
-    </v-app-bar>
-
-    <v-main>
-      <v-container class="py-8">
-        <router-view />
-      </v-container>
-    </v-main>
+    <!--
+      No global chrome. The landing page is specified to show a profile icon and
+      nothing else, so each view owns its own header.
+    -->
+    <router-view />
   </v-app>
 </template>
-
-<script>
-export default {
-  name: 'App'
-}
-</script>

@@ -3,7 +3,7 @@ node_modules
 /dist
 /.claude
 /.vscode
-
+.env
 
 # local env files
 .env.local
