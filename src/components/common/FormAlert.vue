@@ -5,14 +5,16 @@
   -->
   <div role="status" aria-live="polite" aria-atomic="true">
     <v-alert
-      v-if="message"
+      v-if="message || $slots.default"
       :type="type"
       variant="tonal"
       density="comfortable"
       rounded="lg"
       class="form-alert"
     >
-      {{ message }}
+      <!-- Default slot lets a caller embed a link (e.g. "Please register")
+           inside the alert; plain messages just use the message prop. -->
+      <slot>{{ message }}</slot>
     </v-alert>
   </div>
 </template>

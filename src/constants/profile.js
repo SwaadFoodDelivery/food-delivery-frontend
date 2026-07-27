@@ -15,6 +15,35 @@ export const GENDER_LABELS = {
   other: 'Other'
 }
 
+export const GENDER_OPTIONS = Object.entries(GENDER_LABELS).map(([value, label]) => ({
+  value,
+  label
+}))
+
+/**
+ * Roles whose onboarding is a full manual verification (documents proving a
+ * license, a vehicle, or authority to act for a business) rather than a bare
+ * identity check. Product decision: these show "pending verification" until
+ * reviewed; `client` activates immediately on submit.
+ *
+ * IMPORTANT: this is a frontend-only distinction. The backend's account_status
+ * enum has no "pending" value (only active/suspended/deleted — see
+ * migrations/000003_create_users.up.sql) and there is no admin approve/reject
+ * endpoint in this codebase, so nothing server-side actually changes for these
+ * roles yet. `account_status` itself still reads "active" underneath; this
+ * only affects what the UI displays in its place, using onboarding_complete +
+ * role as a proxy signal.
+ */
+export const ROLES_PENDING_MANUAL_VERIFICATION = [
+  ROLES.DRIVER,
+  ROLES.RESTAURANT_OWNER,
+  ROLES.RESTAURANT_MANAGER
+]
+
+export const VERIFICATION_STATUS_LABEL = 'Pending verification'
+export const VERIFICATION_STATUS_MESSAGE =
+  'Your documents are being reviewed. This usually takes up to 24 hours.'
+
 /** Which extra fields to render per role, and where to read them from. */
 export const ROLE_PROFILE_FIELDS = {
   [ROLES.CLIENT]: [

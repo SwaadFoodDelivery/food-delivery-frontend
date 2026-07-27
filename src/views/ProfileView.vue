@@ -41,9 +41,12 @@
               <span v-if="profile.email_verified" class="profile__badge">Verified</span>
             </template>
           </ProfileField>
-          <ProfileField label="Account status" :value="profile.account_status" />
+          <ProfileField label="Account status" :value="accountStatusLabel" />
           <ProfileField label="Member since" :value="formatDate(profile.created_at)" />
         </dl>
+        <p v-if="auth.isPendingManualVerification" class="profile__pending-note">
+          {{ VERIFICATION_STATUS_MESSAGE }}
+        </p>
 
         <!-- Role-specific block, driven by what the backend returns for this role. -->
         <h2 class="profile__section-title">{{ roleLabel }} details</h2>
@@ -81,7 +84,9 @@ import {
   PROFILE_EMPTY_VALUE,
   PROFILE_MESSAGES,
   ROLES_WITHOUT_PROFILE_DETAILS,
-  ROLE_PROFILE_FIELDS
+  ROLE_PROFILE_FIELDS,
+  VERIFICATION_STATUS_LABEL,
+  VERIFICATION_STATUS_MESSAGE
 } from '@/constants/profile'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { toErrorMessage } from '@/utils/errors'
@@ -98,6 +103,18 @@ const roleLabel = computed(() => ROLE_LABELS[profile.value?.role] || profile.val
 const initial = computed(() => (profile.value?.name || '').trim().charAt(0).toUpperCase())
 
 const roleFields = computed(() => ROLE_PROFILE_FIELDS[profile.value?.role] ?? [])
+
+/**
+ * Suspension always wins (a real backend state); otherwise driver/restaurant
+ * roles show the frontend-computed "pending verification" label in place of
+ * the raw account_status — see isPendingManualVerification in the auth store
+ * for why this isn't a real backend value.
+ */
+const accountStatusLabel = computed(() => {
+  if (auth.isAccountSuspended) return profile.value.account_status
+  if (auth.isPendingManualVerification) return VERIFICATION_STATUS_LABEL
+  return profile.value.account_status
+})
 
 /**
  * The backend has no role profile table for restaurant roles, so `profile` is
@@ -267,6 +284,15 @@ onMounted(load)
   border-radius: 16px;
   background-color: rgb(var(--v-theme-surface-variant));
   font-size: 0.9rem;
+}
+
+.profile__pending-note {
+  margin: -0.5rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background-color: rgb(var(--v-theme-surface-variant));
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }
 
 .profile__badge {

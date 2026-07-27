@@ -24,6 +24,17 @@ export const ROLE_LABELS = ROLE_OPTIONS.reduce((acc, option) => {
   return acc
 }, {})
 
+/**
+ * Roles selectable at sign-up. Excludes restaurant_manager: that account is
+ * provisioned by the restaurant owner, not self-registered — the backend
+ * rejects it too (validations/auth.go's ValidateRegisterBody, 400
+ * VALIDATION_ERROR). Sign-in still offers every role, since an
+ * already-provisioned manager account must still be able to log in.
+ */
+export const SELF_REGISTRATION_ROLE_OPTIONS = ROLE_OPTIONS.filter(
+  (option) => option.value !== ROLES.RESTAURANT_MANAGER
+)
+
 /** users.account_status — 'deleted' exists in the enum but is never returned. */
 export const ACCOUNT_STATUS = {
   ACTIVE: 'active',

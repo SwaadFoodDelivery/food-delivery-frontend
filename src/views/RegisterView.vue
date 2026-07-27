@@ -4,7 +4,12 @@
       <FormAlert :message="feedback.message" :type="feedback.type" />
 
       <form novalidate @submit.prevent="onRegister">
-        <RoleSelectField v-model="form.role" :disabled="isBusy" :error-message="errors.role" />
+        <RoleSelectField
+          v-model="form.role"
+          :options="SELF_REGISTRATION_ROLE_OPTIONS"
+          :disabled="isBusy"
+          :error-message="errors.role"
+        />
 
         <v-text-field
           v-model="form.name"
@@ -72,7 +77,8 @@ import {
   ERROR_CODES,
   NAME_MAX_LENGTH,
   REGISTER_STEPS,
-  ROLES
+  ROLES,
+  SELF_REGISTRATION_ROLE_OPTIONS
 } from '@/constants/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { isValidEmail, isValidIndianPhone, isValidName, sanitizePhoneInput } from '@/utils/validators'
@@ -83,12 +89,16 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 
+const registerableRoleValues = SELF_REGISTRATION_ROLE_OPTIONS.map((option) => option.value)
+
 const step = ref(REGISTER_STEPS.DETAILS)
 const form = reactive({
   name: '',
   email: '',
+  // A deep link with role=restaurant_manager (e.g. from a stale bookmark)
+  // must not silently pick that role back up — it isn't offered here.
   phone: sanitizePhoneInput(route.query.phone ?? ''),
-  role: Object.values(ROLES).includes(route.query.role) ? route.query.role : ROLES.CLIENT,
+  role: registerableRoleValues.includes(route.query.role) ? route.query.role : ROLES.CLIENT,
   referralCode: ''
 })
 const errors = reactive({ name: '', phone: '', role: '' })
@@ -194,8 +204,19 @@ async function onVerified() {
 </script>
 
 <style scoped>
+/*
+ * Vuetify's persistent-hint sits directly under a field with very little
+ * clearance, so with no gap here it visually crowds the next field's label
+ * the moment that label floats up (focus or a filled value).
+ */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
 .register__gate-note {
-  margin: 0.75rem 0 0;
+  margin: 0;
   font-size: 0.875rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }

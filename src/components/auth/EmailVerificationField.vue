@@ -18,11 +18,11 @@
       <AppButton
         v-if="!isVerified"
         variant="secondary"
-        :disabled="disabled || !isEmailValid"
+        :disabled="disabled || !isEmailValid || !canSend"
         :loading="isSending"
         @click="onSendCode"
       >
-        {{ codeSent ? 'Resend code' : 'Send verification code' }}
+        {{ sendButtonLabel }}
       </AppButton>
 
       <p v-else class="email-verify__verified">
@@ -49,13 +49,18 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 
 import AppButton from '@/components/common/AppButton.vue'
 import FormAlert from '@/components/common/FormAlert.vue'
 import OtpField from '@/components/common/OtpField.vue'
 import { useAuthStore } from '@/stores/auth'
-import { AUTH_MESSAGES, EMAIL_VERIFICATION_TTL_MINUTES, OTP_TTL_MINUTES } from '@/constants/auth'
+import {
+  AUTH_MESSAGES,
+  EMAIL_VERIFICATION_TTL_MINUTES,
+  OTP_RESEND_COOLDOWN_SECONDS,
+  OTP_TTL_MINUTES
+} from '@/constants/auth'
 import { isValidEmail, isValidOtp } from '@/utils/validators'
 import { toErrorMessage } from '@/utils/errors'
 
@@ -77,7 +82,28 @@ const emailError = ref('')
 const otpError = ref('')
 const feedback = reactive({ message: '', type: 'info' })
 
+// Cooldown only applies to *resending* — the first send (codeSent still
+// false) is never gated by it.
+const cooldown = ref(0)
+let cooldownTimerId = null
+
+function startCooldown() {
+  cooldown.value = OTP_RESEND_COOLDOWN_SECONDS
+  window.clearInterval(cooldownTimerId)
+  cooldownTimerId = window.setInterval(() => {
+    cooldown.value = Math.max(0, cooldown.value - 1)
+    if (cooldown.value === 0) window.clearInterval(cooldownTimerId)
+  }, 1000)
+}
+
+onBeforeUnmount(() => window.clearInterval(cooldownTimerId))
+
 const isEmailValid = computed(() => isValidEmail(props.modelValue))
+const canSend = computed(() => !codeSent.value || cooldown.value === 0)
+const sendButtonLabel = computed(() => {
+  if (!codeSent.value) return 'Send verification code'
+  return cooldown.value > 0 ? `Resend code in ${cooldown.value}s` : 'Resend code'
+})
 
 /**
  * The gate. `auth.isEmailVerifiedFor` compares against the exact address the
@@ -112,6 +138,7 @@ async function onSendCode() {
     maskedEmail.value = data?.masked_email || ''
     codeSent.value = true
     otp.value = ''
+    startCooldown()
     setFeedback(data?.message || 'Verification code sent.', 'success')
   } catch (error) {
     setFeedback(toErrorMessage(error), 'error')
@@ -149,6 +176,8 @@ watch(
       codeSent.value = false
       otp.value = ''
       maskedEmail.value = ''
+      window.clearInterval(cooldownTimerId)
+      cooldown.value = 0
       setFeedback(AUTH_MESSAGES.EMAIL_CHANGED_AFTER_VERIFY, 'warning')
     }
   }

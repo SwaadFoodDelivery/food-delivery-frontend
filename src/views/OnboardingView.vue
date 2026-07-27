@@ -36,6 +36,14 @@
 
       <!-- Document upload -->
       <template v-else>
+        <PersonalDetailsCard
+          v-if="isClientRole"
+          :saved="detailsSaved"
+          :is-saving="isSavingDetails"
+          :disabled="isSubmitting"
+          @save="onSaveDetails"
+        />
+
         <div class="onboarding__progress">
           <v-progress-linear
             :model-value="onboarding.progressPercent"
@@ -62,9 +70,13 @@
           />
         </ul>
 
+        <p v-if="isClientRole && !detailsSaved" class="onboarding__gate-note">
+          Save your details above to enable submission.
+        </p>
+
         <AppButton
           block
-          :disabled="!onboarding.allDocumentsUploaded"
+          :disabled="!canSubmit"
           :loading="isSubmitting"
           @click="onSubmit"
         >
@@ -92,9 +104,11 @@ import { useRouter } from 'vue-router'
 import AppButton from '@/components/common/AppButton.vue'
 import FormAlert from '@/components/common/FormAlert.vue'
 import DocumentUploadCard from '@/components/onboarding/DocumentUploadCard.vue'
+import PersonalDetailsCard from '@/components/onboarding/PersonalDetailsCard.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOnboardingStore } from '@/stores/onboarding'
-import { ERROR_CODES, ROLE_LABELS } from '@/constants/auth'
+import { updateClientProfile } from '@/services/profileService'
+import { ERROR_CODES, ROLES, ROLE_LABELS } from '@/constants/auth'
 import { ONBOARDING_INTRO, ONBOARDING_MESSAGES } from '@/constants/onboarding'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { hasErrorCode, toErrorMessage } from '@/utils/errors'
@@ -108,6 +122,17 @@ const isSubmitting = ref(false)
 const loadError = ref('')
 const submittedMessage = ref(ONBOARDING_MESSAGES.SUBMIT_SUCCESS)
 const feedback = reactive({ message: '', type: 'info' })
+
+// Date of birth / gender are client-only fields on the backend (business/
+// profile.go only upserts them when the authenticated role is client), so
+// this step only exists for that role.
+const isClientRole = computed(() => auth.role === ROLES.CLIENT)
+const detailsSaved = ref(false)
+const isSavingDetails = ref(false)
+
+const canSubmit = computed(
+  () => onboarding.allDocumentsUploaded && (!isClientRole.value || detailsSaved.value)
+)
 
 const roleLabel = computed(() => ROLE_LABELS[auth.role] || auth.role)
 const intro = computed(
@@ -146,6 +171,21 @@ async function start() {
     loadError.value = toErrorMessage(error)
   } finally {
     isLoading.value = false
+  }
+}
+
+/** Saves date of birth + gender via PUT /users/me/profile. */
+async function onSaveDetails({ dateOfBirth, gender }) {
+  isSavingDetails.value = true
+  setFeedback('')
+  try {
+    await updateClientProfile({ dateOfBirth, gender })
+    detailsSaved.value = true
+    await auth.fetchProfile({ force: true })
+  } catch (error) {
+    setFeedback(toErrorMessage(error), 'error')
+  } finally {
+    isSavingDetails.value = false
   }
 }
 
@@ -204,6 +244,11 @@ onMounted(async () => {
   } catch {
     // Non-fatal — start() will surface anything that actually blocks onboarding.
   }
+  // Already saved in an earlier, interrupted onboarding attempt — don't force
+  // filling the form out again.
+  if (auth.profile?.profile?.date_of_birth && auth.profile?.profile?.gender) {
+    detailsSaved.value = true
+  }
   await start()
 })
 </script>
@@ -256,6 +301,12 @@ onMounted(async () => {
 
 .onboarding__progress-text {
   margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+.onboarding__gate-note {
+  margin: 0;
   font-size: 0.875rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
 }

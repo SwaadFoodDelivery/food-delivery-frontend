@@ -1,7 +1,14 @@
 <template>
   <AuthCard heading="Sign in" :lead="leadText">
     <template v-if="step === LOGIN_STEPS.IDENTIFY">
-      <FormAlert :message="feedback.message" :type="feedback.type" />
+      <!-- The unregistered case gets its own alert so "Register" can be a real
+           link rather than plain text inside the backend's message string. -->
+      <FormAlert v-if="isUnregistered" type="warning">
+        Account not found.
+        <router-link :to="registerTarget">Register</router-link>
+        to create one.
+      </FormAlert>
+      <FormAlert v-else :message="feedback.message" :type="feedback.type" />
 
       <form novalidate @submit.prevent="onContinue">
         <RoleSelectField v-model="form.role" :disabled="isBusy" :error-message="errors.role" />
@@ -20,9 +27,6 @@
           New here?
           <router-link :to="registerTarget">Create an account</router-link>
         </p>
-        <AppButton variant="ghost" :loading="isStartingGuest" @click="onContinueAsGuest">
-          Continue as guest
-        </AppButton>
       </div>
     </template>
 
@@ -67,7 +71,7 @@ const errors = reactive({ phone: '', role: '' })
 const feedback = reactive({ message: '', type: 'info' })
 const maskedPhone = ref('')
 const isBusy = ref(false)
-const isStartingGuest = ref(false)
+const isUnregistered = ref(false)
 
 const leadText = computed(() =>
   step.value === LOGIN_STEPS.IDENTIFY
@@ -100,10 +104,11 @@ async function onContinue() {
 
   isBusy.value = true
   setFeedback('')
+  isUnregistered.value = false
   try {
     const status = await auth.checkPhone({ phone: form.phone, role: form.role })
     if (!status?.registered) {
-      setFeedback(status?.message || AUTH_MESSAGES.ACCOUNT_NOT_FOUND, 'warning')
+      isUnregistered.value = true
       return
     }
     const data = await auth.sendLoginOtp({ phone: form.phone, role: form.role })
@@ -139,23 +144,20 @@ async function onVerified() {
   }
   router.replace(resolvePostAuthRoute(auth, String(route.query.redirect ?? '')))
 }
-
-/** Guest login: establish the guest session and continue without an account. */
-async function onContinueAsGuest() {
-  isStartingGuest.value = true
-  setFeedback('')
-  try {
-    await auth.ensureGuestSession()
-    router.replace({ name: ROUTE_NAMES.LANDING })
-  } catch (error) {
-    setFeedback(toErrorMessage(error), 'error')
-  } finally {
-    isStartingGuest.value = false
-  }
-}
 </script>
 
 <style scoped>
+/*
+ * Vuetify's persistent-hint sits directly under a field with very little
+ * clearance, so with no gap here it visually crowds the next field's label
+ * the moment that label floats up (focus or a filled value).
+ */
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
 .login__alt {
   margin-top: 1.25rem;
   padding-top: 1rem;

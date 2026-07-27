@@ -1,14 +1,6 @@
 /**
  * The single HTTP client. Every service goes through `request()`.
  *
- * NOTE ON AXIOS: Clauderules.md specifies Axios, but axios is not a declared
- * dependency in package.json (it is only present transitively, so a clean
- * `npm ci` would not install it) and the rules also forbid adding packages
- * without approval. This module therefore implements the same contract —
- * one configured client, credential injection, error normalisation, timeouts —
- * on top of fetch. Swapping the body of `send()` for an Axios instance is the
- * only change needed if axios is later added to package.json.
- *
  * Envelope (pkg/response/response.go):
  *   { status: "success", data }
  *   { status: "error", error_code, message, details, data? }
@@ -17,12 +9,13 @@
  * account, so success is decided by the envelope, never by the status code
  * alone.
  */
+import axios from 'axios'
+
 import { API_URLS } from '@/constants/apis'
 import {
   API_BASE_URL,
   AUTH_MODE,
   CLIENT_API_KEY,
-  CONTENT_TYPES,
   GENERIC_ERROR_MESSAGE,
   HTTP_HEADERS,
   HTTP_METHODS,
@@ -34,6 +27,7 @@ import {
 } from '@/constants/common'
 import { GUEST_TOKEN_ERROR_CODES, SESSION_ERROR_CODES } from '@/constants/auth'
 import { getDeviceId } from '@/utils/device'
+import logger from '@/utils/logger'
 
 /** Normalised failure. Every rejected service call throws one of these. */
 export class ApiError extends Error {
@@ -98,45 +92,47 @@ export function buildPath(template, params = {}) {
   )
 }
 
-function buildQuery(query) {
-  const entries = Object.entries(query).filter(([, value]) => value !== undefined && value !== null && value !== '')
-  if (entries.length === 0) return ''
-  return `?${new URLSearchParams(entries).toString()}`
-}
+const http = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: REQUEST_TIMEOUT_MS,
+  // Needed so the HttpOnly refresh cookie set for X-Client-Type: web is stored.
+  withCredentials: true,
+  headers: { [HTTP_HEADERS.ACCEPT]: 'application/json' }
+})
 
 /**
  * Attaches the credential the endpoint expects. The backend is strict here:
  * the API key is accepted only on init-session, and public auth endpoints
  * reject a Bearer token in place of the guest token.
  */
-function applyAuthHeaders(headers, authMode) {
+http.interceptors.request.use((config) => {
+  config.headers[HTTP_HEADERS.DEVICE_ID] = getDeviceId()
+
+  const authMode = config.authMode ?? AUTH_MODE.NONE
   if (authMode === AUTH_MODE.API_KEY && CLIENT_API_KEY) {
-    headers[HTTP_HEADERS.API_KEY] = CLIENT_API_KEY
-    return
-  }
-  if (authMode === AUTH_MODE.GUEST) {
+    config.headers[HTTP_HEADERS.API_KEY] = CLIENT_API_KEY
+  } else if (authMode === AUTH_MODE.GUEST) {
     const guestToken = hooks.getGuestToken()
-    if (guestToken) headers[HTTP_HEADERS.GUEST_TOKEN] = guestToken
-    return
-  }
-  if (authMode === AUTH_MODE.BEARER) {
+    if (guestToken) config.headers[HTTP_HEADERS.GUEST_TOKEN] = guestToken
+  } else if (authMode === AUTH_MODE.BEARER) {
     const accessToken = hooks.getAccessToken()
-    if (accessToken) headers[HTTP_HEADERS.AUTHORIZATION] = `Bearer ${accessToken}`
+    if (accessToken) config.headers[HTTP_HEADERS.AUTHORIZATION] = `Bearer ${accessToken}`
   }
-}
 
-async function parseBody(response) {
-  const text = await response.text()
-  if (!text) return null
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { message: text }
+  return config
+})
+
+/** Turns an axios success/error into either the envelope's `data` or a thrown ApiError. */
+function toApiError(error) {
+  const response = error.response
+  if (!response) {
+    const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT'
+    logger.error('Network request failed', { url: error.config?.url, code: error.code })
+    return new ApiError({ status: 0, message: isTimeout ? TIMEOUT_ERROR_MESSAGE : NETWORK_ERROR_MESSAGE })
   }
-}
 
-function toApiError(response, payload) {
-  const retryAfterHeader = response.headers.get(HTTP_HEADERS.RETRY_AFTER)
+  const payload = response.data
+  const retryAfterHeader = response.headers?.[HTTP_HEADERS.RETRY_AFTER.toLowerCase()]
   return new ApiError({
     status: response.status,
     errorCode: payload?.error_code,
@@ -147,27 +143,25 @@ function toApiError(response, payload) {
   })
 }
 
-async function send(url, { method, headers, body, timeoutMs }) {
-  const controller = new AbortController()
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    return await window.fetch(url, {
-      method,
-      headers,
-      body,
-      signal: controller.signal,
-      // Needed so the HttpOnly refresh cookie set for X-Client-Type: web is stored.
-      credentials: 'include'
-    })
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new ApiError({ status: 0, message: TIMEOUT_ERROR_MESSAGE })
+http.interceptors.response.use(
+  (response) => {
+    // Some endpoints (e.g. a suspended account on check-phone) answer HTTP 200
+    // with status:"error" — the envelope, not the status code, decides success.
+    if (response.data?.status === RESPONSE_STATUS.ERROR) {
+      return Promise.reject(
+        new ApiError({
+          status: response.status,
+          errorCode: response.data.error_code,
+          message: response.data.message,
+          details: response.data.details,
+          data: response.data.data
+        })
+      )
     }
-    throw new ApiError({ status: 0, message: NETWORK_ERROR_MESSAGE })
-  } finally {
-    window.clearTimeout(timer)
-  }
-}
+    return response
+  },
+  (error) => Promise.reject(error instanceof ApiError ? error : toApiError(error))
+)
 
 /**
  * Performs one request and unwraps the response envelope.
@@ -197,49 +191,42 @@ export async function request(path, options = {}) {
     retryOnGuestTokenFailure = true
   } = options
 
-  const url = `${API_BASE_URL}${buildPath(path, params)}${buildQuery(query ?? {})}`
-  const headers = {
-    [HTTP_HEADERS.ACCEPT]: CONTENT_TYPES.JSON,
-    // Required by init-session, register, send-otp and verify-otp; harmless
-    // elsewhere and it keeps the guest token's device binding satisfied.
-    [HTTP_HEADERS.DEVICE_ID]: getDeviceId(),
-    ...extraHeaders
-  }
-  if (body !== undefined) headers[HTTP_HEADERS.CONTENT_TYPE] = CONTENT_TYPES.JSON
-  applyAuthHeaders(headers, authMode)
+  try {
+    const response = await http.request({
+      url: buildPath(path, params),
+      method,
+      data: body,
+      params: query,
+      timeout: timeoutMs,
+      headers: extraHeaders,
+      authMode
+    })
+    return response.data?.data ?? null
+  } catch (thrown) {
+    const error = thrown instanceof ApiError ? thrown : toApiError(thrown)
 
-  const response = await send(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    timeoutMs
-  })
-  const payload = await parseBody(response)
-
-  if (response.ok && payload?.status !== RESPONSE_STATUS.ERROR) {
-    return payload?.data ?? null
-  }
-
-  const error = toApiError(response, payload)
-
-  // A guest token lives 60 minutes. Rather than surfacing an expiry as a form
-  // error, mint a fresh one and replay the request exactly once.
-  if (
-    authMode === AUTH_MODE.GUEST &&
-    retryOnGuestTokenFailure &&
-    GUEST_TOKEN_ERROR_CODES.includes(error.errorCode)
-  ) {
-    const refreshed = await hooks.refreshGuestToken()
-    if (refreshed) {
-      return request(path, { ...options, retryOnGuestTokenFailure: false })
+    // A guest token lives 60 minutes. Rather than surfacing an expiry as a form
+    // error, mint a fresh one and replay the request exactly once.
+    if (
+      authMode === AUTH_MODE.GUEST &&
+      retryOnGuestTokenFailure &&
+      GUEST_TOKEN_ERROR_CODES.includes(error.errorCode)
+    ) {
+      const refreshed = await hooks.refreshGuestToken()
+      if (refreshed) {
+        return request(path, { ...options, retryOnGuestTokenFailure: false })
+      }
     }
-  }
 
-  // There is no refresh endpoint on this backend, so an expired access token is
-  // terminal: drop the session and let the router send the user to sign-in.
-  if (error.isSessionExpired && path !== API_URLS.AUTH_LOGOUT) {
-    hooks.onSessionExpired(error)
-  }
+    // There is no refresh endpoint on this backend, so an expired access token
+    // is terminal: drop the session and let the router send the user to sign-in.
+    if (error.isSessionExpired && path !== API_URLS.AUTH_LOGOUT) {
+      logger.auth('Session invalid — clearing auth session', { path, code: error.errorCode })
+      hooks.onSessionExpired(error)
+    }
 
-  throw error
+    throw error
+  }
 }
+
+export default http

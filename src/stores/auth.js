@@ -11,8 +11,17 @@ import { initSession } from '@/services/sessionService'
 import { getProfile } from '@/services/profileService'
 import { ACCOUNT_STATUS, ERROR_CODES } from '@/constants/auth'
 import { STORAGE_KEYS } from '@/constants/common'
-import { readValue, removeValue, writeValue } from '@/utils/storage'
+import { ROLES_PENDING_MANUAL_VERIFICATION } from '@/constants/profile'
+import {
+  readSessionValue,
+  readValue,
+  removeSessionValue,
+  removeValue,
+  writeSessionValue,
+  writeValue
+} from '@/utils/storage'
 import { normalizeEmail } from '@/utils/validators'
+import logger from '@/utils/logger'
 
 export const useAuthStore = defineStore('auth', () => {
   // ─── Guest session ─────────────────────────────────────────────────────────
@@ -21,15 +30,30 @@ export const useAuthStore = defineStore('auth', () => {
   const guestSessionPromise = ref(null)
 
   // ─── Authenticated session ─────────────────────────────────────────────────
-  const accessToken = ref(readValue(STORAGE_KEYS.ACCESS_TOKEN, '') || '')
+  // sessionStorage, not localStorage: cleared when the tab/browser closes.
+  // Access tokens expire in 60 minutes server-side regardless (no refresh
+  // endpoint on this backend), so this costs nothing beyond the sign-in the
+  // user would need anyway — it just shortens how long a stolen disk keeps a
+  // live session.
+  const accessToken = ref(readSessionValue(STORAGE_KEYS.ACCESS_TOKEN, '') || '')
   /** The `user` object from verify-otp — carries `first_time_user`. */
-  const user = ref(readValue(STORAGE_KEYS.USER, null))
+  const user = ref(readSessionValue(STORAGE_KEYS.USER, null))
   /** The full `GET /users/me/profile` payload, loaded lazily. */
   const profile = ref(null)
 
   // ─── Pre-registration email verification ───────────────────────────────────
   /** The address most recently confirmed by POST /auth/verify-email. */
   const verifiedEmail = ref('')
+
+  /**
+   * Reactive mirror of STORAGE_KEYS.ONBOARDING_SUBMITTED. A `computed` that
+   * called `readValue()` directly here would cache against a plain
+   * localStorage read, which Vue's reactivity has no visibility into — a
+   * write from `markOnboardingComplete()` would then go unnoticed until some
+   * unrelated dependency (profile/userId) happened to change too. Keeping it
+   * as a ref makes it a real, trackable dependency.
+   */
+  const onboardingSubmittedMap = ref(readValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, {}) || {})
 
   const isAuthenticated = computed(() => Boolean(accessToken.value))
   const role = computed(() => profile.value?.role || user.value?.role || '')
@@ -57,8 +81,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isOnboardingComplete = computed(() => {
     if (profile.value?.onboarding_complete === true) return true
     if (!userId.value) return false
-    const submitted = readValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, {}) || {}
-    return submitted[userId.value] === true
+    return onboardingSubmittedMap.value[userId.value] === true
   })
 
   /**
@@ -72,6 +95,17 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAccountSuspended = computed(
     () => (profile.value?.account_status || user.value?.account_status) === ACCOUNT_STATUS.SUSPENDED
+  )
+
+  /**
+   * Product decision, not a backend state: driver/restaurant roles show
+   * "pending verification" until reviewed, client activates immediately.
+   * See ROLES_PENDING_MANUAL_VERIFICATION for why this can't be a real
+   * account_status value today. Suspension still wins — a suspended account
+   * says so regardless of role.
+   */
+  const isPendingManualVerification = computed(
+    () => !isAccountSuspended.value && ROLES_PENDING_MANUAL_VERIFICATION.includes(role.value)
   )
 
   /**
@@ -130,28 +164,30 @@ export const useAuthStore = defineStore('auth', () => {
     accessToken.value = token || ''
     user.value = verifiedUser || null
     profile.value = null
-    writeValue(STORAGE_KEYS.ACCESS_TOKEN, accessToken.value)
-    writeValue(STORAGE_KEYS.USER, user.value)
+    writeSessionValue(STORAGE_KEYS.ACCESS_TOKEN, accessToken.value)
+    writeSessionValue(STORAGE_KEYS.USER, user.value)
+    logger.auth('Session established', { userId: user.value?.user_id, role: user.value?.role })
   }
 
   function clearSession() {
     accessToken.value = ''
     user.value = null
     profile.value = null
-    removeValue(STORAGE_KEYS.ACCESS_TOKEN)
-    removeValue(STORAGE_KEYS.USER)
+    removeSessionValue(STORAGE_KEYS.ACCESS_TOKEN)
+    removeSessionValue(STORAGE_KEYS.USER)
   }
 
   /** Records a finished onboarding for this user, per the note on isOnboardingComplete. */
   function markOnboardingComplete() {
     if (!userId.value) return
-    const submitted = readValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, {}) || {}
-    submitted[userId.value] = true
-    writeValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, submitted)
+    // Reassign (not mutate-in-place) so the ref itself changes and
+    // isOnboardingComplete's computed is notified.
+    onboardingSubmittedMap.value = { ...onboardingSubmittedMap.value, [userId.value]: true }
+    writeValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, onboardingSubmittedMap.value)
     if (profile.value) profile.value = { ...profile.value, onboarding_complete: true }
     if (user.value) {
       user.value = { ...user.value, first_time_user: false }
-      writeValue(STORAGE_KEYS.USER, user.value)
+      writeSessionValue(STORAGE_KEYS.USER, user.value)
     }
   }
 
@@ -226,6 +262,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** Revokes the session server-side, then clears it locally regardless. */
   async function signOut() {
+    const signedOutUserId = userId.value
     if (isAuthenticated.value) {
       try {
         await authService.logout()
@@ -236,6 +273,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
     clearSession()
+    logger.auth('User signed out', { userId: signedOutUserId })
   }
 
   // ─── Wiring ────────────────────────────────────────────────────────────────
@@ -281,6 +319,7 @@ export const useAuthStore = defineStore('auth', () => {
     isOnboardingComplete,
     needsOnboarding,
     isAccountSuspended,
+    isPendingManualVerification,
     // actions
     isEmailVerifiedFor,
     ensureGuestSession,

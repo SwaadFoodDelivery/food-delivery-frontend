@@ -18,7 +18,11 @@
     </header>
 
     <main class="landing__main">
-      <h1 class="landing__sr-only">Home</h1>
+      <template v-if="auth.isPendingManualVerification">
+        <h1 class="landing__welcome">Verification pending</h1>
+        <p class="landing__subtext">{{ VERIFICATION_STATUS_MESSAGE }}</p>
+      </template>
+      <h1 v-else class="landing__welcome">Welcome people</h1>
     </main>
   </div>
 </template>
@@ -29,6 +33,7 @@ import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
+import { VERIFICATION_STATUS_MESSAGE } from '@/constants/profile'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -83,12 +88,31 @@ function onOpenProfile() {
   font-size: 1.05rem;
 }
 
-.landing__sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+.landing__main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 76px);
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+
+.landing__welcome {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  color: rgb(var(--v-theme-primary));
+}
+
+.landing__subtext {
+  margin: 0.75rem 0 0;
+  font-size: 1rem;
+  color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+@media (min-width: 600px) {
+  .landing__welcome {
+    font-size: 2.75rem;
+  }
 }
 </style>

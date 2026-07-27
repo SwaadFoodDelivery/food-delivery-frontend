@@ -31,3 +31,25 @@ export async function getProfile() {
     authMode: AUTH_MODE.BEARER
   })
 }
+
+/**
+ * PUT /users/me/profile — Bearer.
+ *
+ * `date_of_birth`/`gender` are only persisted when the authenticated user's
+ * role is client (business/profile.go gates the upsert on that role
+ * server-side) — sending them for any other role is silently a no-op.
+ * `email` is rejected outright (400) if present; this function never sends it.
+ *
+ * @param {{dateOfBirth?: string, gender?: string}} params dateOfBirth as YYYY-MM-DD
+ * @returns {Promise<object>} the updated profile, same shape as getProfile()
+ */
+export async function updateClientProfile({ dateOfBirth, gender } = {}) {
+  const body = {}
+  if (dateOfBirth) body.date_of_birth = dateOfBirth
+  if (gender) body.gender = gender
+  return request(API_URLS.PROFILE_ME, {
+    method: HTTP_METHODS.PUT,
+    authMode: AUTH_MODE.BEARER,
+    body
+  })
+}

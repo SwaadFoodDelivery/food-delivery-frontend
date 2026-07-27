@@ -1,7 +1,7 @@
 <template>
   <v-select
     :model-value="modelValue"
-    :items="ROLE_OPTIONS"
+    :items="options"
     item-title="label"
     item-value="value"
     :label="label"
@@ -23,7 +23,14 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   label: { type: String, default: 'I am a' },
   disabled: { type: Boolean, default: false },
-  errorMessage: { type: String, default: '' }
+  errorMessage: { type: String, default: '' },
+  /**
+   * Defaults to every role (needed for sign-in, since an already-provisioned
+   * account of any role must still be able to log in). Pass a filtered list
+   * where a role can't be picked at all, e.g. sign-up excluding
+   * restaurant_manager (that role is provisioned by the restaurant owner).
+   */
+  options: { type: Array, default: () => ROLE_OPTIONS }
 })
 
 defineEmits(['update:modelValue'])
@@ -34,6 +41,6 @@ defineEmits(['update:modelValue'])
  * choice means before the user commits to it.
  */
 const selectedHint = computed(
-  () => ROLE_OPTIONS.find((option) => option.value === props.modelValue)?.hint ?? ''
+  () => props.options.find((option) => option.value === props.modelValue)?.hint ?? ''
 )
 </script>
