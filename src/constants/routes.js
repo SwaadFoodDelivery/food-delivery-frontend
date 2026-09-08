@@ -4,7 +4,8 @@ export const ROUTE_NAMES = {
   REGISTER: 'register',
   ONBOARDING: 'onboarding',
   LANDING: 'landing',
-  PROFILE: 'profile'
+  PROFILE: 'profile',
+  TRACKING: 'tracking'
 }
 
 export const ROUTE_PATHS = {
@@ -12,5 +13,6 @@ export const ROUTE_PATHS = {
   [ROUTE_NAMES.REGISTER]: '/register',
   [ROUTE_NAMES.ONBOARDING]: '/onboarding',
   [ROUTE_NAMES.LANDING]: '/',
-  [ROUTE_NAMES.PROFILE]: '/profile'
+  [ROUTE_NAMES.PROFILE]: '/profile',
+  [ROUTE_NAMES.TRACKING]: '/orders/:orderId/tracking'
 }

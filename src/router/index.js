@@ -34,6 +34,12 @@ const routes = [
     component: () => import('@/views/ProfileView.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.TRACKING],
+    name: ROUTE_NAMES.TRACKING,
+    component: () => import('@/views/DeliveryTrackingView.vue'),
+    meta: { requiresAuth: true }
+  },
   { path: '/:pathMatch(.*)*', redirect: { name: ROUTE_NAMES.LANDING } }
 ]
 

@@ -25,6 +25,10 @@ export const API_URLS = {
   // Profile (protected).
   PROFILE_ME: '/users/me/profile',
 
+  // Mock delivery tracking (protected). The backend labels this simulation
+  // explicitly; it does not represent live courier GPS or dispatch.
+  ORDER_DELIVERY: '/orders/:orderId/delivery',
+
   // Onboarding (protected, except the upload callback which is public).
   ONBOARDING_INIT: '/onboarding/role/init',
   ONBOARDING_SUBMIT: '/onboarding/:id/submit',
