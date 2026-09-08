@@ -25,7 +25,7 @@
       <h1 v-else class="landing__welcome">Welcome people</h1>
       <div class="landing__actions">
         <button type="button" class="landing__order" @click="onStartOrdering">
-          {{ auth.isAuthenticated ? 'Browse Shamgarh kitchens' : 'Sign in to order' }}
+          {{ primaryActionLabel }}
           <v-icon icon="mdi-arrow-right" size="18" aria-hidden="true" />
         </button>
       </div>
@@ -38,6 +38,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { ROLES } from '@/constants/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { VERIFICATION_STATUS_MESSAGE } from '@/constants/profile'
 
@@ -47,12 +48,21 @@ const auth = useAuthStore()
 const initial = computed(() => auth.displayName.trim().charAt(0).toUpperCase())
 
 const actionLabel = computed(() => (auth.isAuthenticated ? 'View profile' : 'Sign in'))
+const isRestaurantOwner = computed(() => auth.role === ROLES.RESTAURANT_OWNER)
+const primaryActionLabel = computed(() => {
+  if (!auth.isAuthenticated) return 'Sign in to order'
+  return isRestaurantOwner.value ? 'Open restaurant orders' : 'Browse Shamgarh kitchens'
+})
 
 function onOpenProfile() {
   router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.PROFILE : ROUTE_NAMES.LOGIN })
 }
 
 function onStartOrdering() {
+  if (isRestaurantOwner.value) {
+    router.push({ name: ROUTE_NAMES.RESTAURANT_ORDERS })
+    return
+  }
   router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.ORDER : ROUTE_NAMES.LOGIN, query: auth.isAuthenticated ? {} : { redirect: '/order' } })
 }
 </script>

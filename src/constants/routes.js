@@ -6,7 +6,8 @@ export const ROUTE_NAMES = {
   LANDING: 'landing',
   PROFILE: 'profile',
   ORDER: 'order',
-  TRACKING: 'tracking'
+  TRACKING: 'tracking',
+  RESTAURANT_ORDERS: 'restaurant-orders'
 }
 
 export const ROUTE_PATHS = {
@@ -16,5 +17,6 @@ export const ROUTE_PATHS = {
   [ROUTE_NAMES.LANDING]: '/',
   [ROUTE_NAMES.PROFILE]: '/profile',
   [ROUTE_NAMES.ORDER]: '/order',
-  [ROUTE_NAMES.TRACKING]: '/orders/:orderId/tracking'
+  [ROUTE_NAMES.TRACKING]: '/orders/:orderId/tracking',
+  [ROUTE_NAMES.RESTAURANT_ORDERS]: '/restaurant/orders'
 }

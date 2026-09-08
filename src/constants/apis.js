@@ -40,6 +40,11 @@ export const API_URLS = {
   ORDER_PAYMENT: '/orders/:orderId/payment',
   ADDRESSES: '/users/me/addresses',
 
+  // Restaurant-owner operations.
+  OWNER_RESTAURANT: '/owner/restaurant',
+  OWNER_RESTAURANT_ORDERS: '/restaurants/:restaurantId/orders',
+  OWNER_ORDER_STATUS: '/restaurants/:restaurantId/orders/:orderId/status',
+
   // Onboarding (protected, except the upload callback which is public).
   ONBOARDING_INIT: '/onboarding/role/init',
   ONBOARDING_SUBMIT: '/onboarding/:id/submit',
