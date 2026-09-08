@@ -35,6 +35,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: ROUTE_PATHS[ROUTE_NAMES.ORDER],
+    name: ROUTE_NAMES.ORDER,
+    component: () => import('@/views/CustomerOrderView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: ROUTE_PATHS[ROUTE_NAMES.TRACKING],
     name: ROUTE_NAMES.TRACKING,
     component: () => import('@/views/DeliveryTrackingView.vue'),

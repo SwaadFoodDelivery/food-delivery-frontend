@@ -29,6 +29,17 @@ export const API_URLS = {
   // explicitly; it does not represent live courier GPS or dispatch.
   ORDER_DELIVERY: '/orders/:orderId/delivery',
 
+  // Customer ordering journey.
+  RESTAURANTS: '/restaurants',
+  RESTAURANT_MENU: '/restaurants/:restaurantId/menu',
+  CART: '/cart',
+  CART_BY_TOKEN: '/cart/:cartToken',
+  CART_ITEM: '/cart/:cartToken/items/:cartItemId',
+  ORDER_QUOTE: '/orders/quote',
+  ORDERS: '/orders',
+  ORDER_PAYMENT: '/orders/:orderId/payment',
+  ADDRESSES: '/users/me/addresses',
+
   // Onboarding (protected, except the upload callback which is public).
   ONBOARDING_INIT: '/onboarding/role/init',
   ONBOARDING_SUBMIT: '/onboarding/:id/submit',

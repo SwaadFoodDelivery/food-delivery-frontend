@@ -23,6 +23,12 @@
         <p class="landing__subtext">{{ VERIFICATION_STATUS_MESSAGE }}</p>
       </template>
       <h1 v-else class="landing__welcome">Welcome people</h1>
+      <div class="landing__actions">
+        <button type="button" class="landing__order" @click="onStartOrdering">
+          {{ auth.isAuthenticated ? 'Browse Shamgarh kitchens' : 'Sign in to order' }}
+          <v-icon icon="mdi-arrow-right" size="18" aria-hidden="true" />
+        </button>
+      </div>
     </main>
   </div>
 </template>
@@ -44,6 +50,10 @@ const actionLabel = computed(() => (auth.isAuthenticated ? 'View profile' : 'Sig
 
 function onOpenProfile() {
   router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.PROFILE : ROUTE_NAMES.LOGIN })
+}
+
+function onStartOrdering() {
+  router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.ORDER : ROUTE_NAMES.LOGIN, query: auth.isAuthenticated ? {} : { redirect: '/order' } })
 }
 </script>
 
@@ -108,6 +118,30 @@ function onOpenProfile() {
   margin: 0.75rem 0 0;
   font-size: 1rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+.landing__actions {
+  margin-top: 1.5rem;
+}
+
+.landing__order {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 46px;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.landing__order:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-info));
+  outline-offset: 2px;
 }
 
 @media (min-width: 600px) {
