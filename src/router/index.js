@@ -53,6 +53,12 @@ const routes = [
     component: () => import('@/views/RestaurantOrdersView.vue'),
     meta: { requiresAuth: true, roles: [ROLES.RESTAURANT_OWNER] }
   },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.DRIVER],
+    name: ROUTE_NAMES.DRIVER,
+    component: () => import('@/views/DriverView.vue'),
+    meta: { requiresAuth: true, roles: [ROLES.DRIVER] }
+  },
   { path: '/:pathMatch(.*)*', redirect: { name: ROUTE_NAMES.LANDING } }
 ]
 

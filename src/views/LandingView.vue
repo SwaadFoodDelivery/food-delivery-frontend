@@ -49,9 +49,12 @@ const initial = computed(() => auth.displayName.trim().charAt(0).toUpperCase())
 
 const actionLabel = computed(() => (auth.isAuthenticated ? 'View profile' : 'Sign in'))
 const isRestaurantOwner = computed(() => auth.role === ROLES.RESTAURANT_OWNER)
+const isDriver = computed(() => auth.role === ROLES.DRIVER)
 const primaryActionLabel = computed(() => {
   if (!auth.isAuthenticated) return 'Sign in to order'
-  return isRestaurantOwner.value ? 'Open restaurant orders' : 'Browse Shamgarh kitchens'
+  if (isRestaurantOwner.value) return 'Open restaurant orders'
+  if (isDriver.value) return 'Open driver dashboard'
+  return 'Browse Shamgarh kitchens'
 })
 
 function onOpenProfile() {
@@ -61,6 +64,10 @@ function onOpenProfile() {
 function onStartOrdering() {
   if (isRestaurantOwner.value) {
     router.push({ name: ROUTE_NAMES.RESTAURANT_ORDERS })
+    return
+  }
+  if (isDriver.value) {
+    router.push({ name: ROUTE_NAMES.DRIVER })
     return
   }
   router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.ORDER : ROUTE_NAMES.LOGIN, query: auth.isAuthenticated ? {} : { redirect: '/order' } })

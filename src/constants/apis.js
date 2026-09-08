@@ -28,6 +28,8 @@ export const API_URLS = {
   // Mock delivery tracking (protected). The backend labels this simulation
   // explicitly; it does not represent live courier GPS or dispatch.
   ORDER_DELIVERY: '/orders/:orderId/delivery',
+  DRIVER_DELIVERY: '/driver/delivery',
+  DRIVER_DELIVERY_STATUS: '/driver/delivery/status',
 
   // Customer ordering journey.
   RESTAURANTS: '/restaurants',
