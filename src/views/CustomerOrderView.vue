@@ -163,8 +163,10 @@
                 <span>{{ item.quantity }} × {{ item.name }}</span><strong>{{ money(item.line_total_minor) }}</strong>
                 <button type="button" class="remove-link" @click="removeItem(item.cart_item_id)">Remove</button>
               </div>
+              <div v-if="serviceability && !serviceability.serviceable" class="serviceability-warning" role="alert"><strong>We can’t deliver to this address</strong><p>{{ serviceability.reason }}</p></div>
+              <p v-else-if="serviceability" class="serviceability-note">{{ serviceability.reason }} · {{ serviceability.estimated_delivery_min }} min · {{ money(serviceability.delivery_fee_minor) }} delivery</p>
               <div v-if="quote" class="summary-total"><span>Subtotal</span><strong>{{ money(quote.subtotal_minor) }}</strong><span>Taxes</span><strong>{{ money(quote.taxes_minor) }}</strong><span>Delivery</span><strong>{{ money(quote.delivery_fee_minor) }}</strong><span class="summary-total__grand">Total</span><strong class="summary-total__grand">{{ money(quote.total_amount_minor) }}</strong></div>
-              <p v-else class="muted-copy">Choose an address to calculate your total.</p>
+              <p v-else-if="!serviceability" class="muted-copy">Choose an address to calculate your total.</p>
               <AppButton block :loading="placingOrder" :disabled="!selectedAddressId || !quote || !cartItemCount" @click="placeDemoOrder">Place demo order</AppButton>
             </v-card-text>
           </v-card>
@@ -184,7 +186,7 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { listRestaurants, getRestaurantMenu } from '@/services/catalogService'
 import { addCartItem, getCart, removeCartItem } from '@/services/cartService'
 import { listAddresses, createAddress } from '@/services/addressService'
-import { quoteOrder, placeOrder, payForOrder } from '@/services/orderService'
+import { checkServiceability, quoteOrder, placeOrder, payForOrder } from '@/services/orderService'
 import { toErrorMessage } from '@/utils/errors'
 
 const router = useRouter()
@@ -205,6 +207,7 @@ const cartToken = ref(sessionStorage.getItem('swaad.cart_token') || '')
 const addresses = ref([])
 const selectedAddressId = ref('')
 const quote = ref(null)
+const serviceability = ref(null)
 const showAddressForm = ref(false)
 const paymentMode = ref('success')
 const addressForm = reactive({ line1: '', area: '', city: 'Shamgarh', state: 'Madhya Pradesh', pincode: '458883', contact_phone: '' })
@@ -298,9 +301,16 @@ async function openCheckout() {
 async function loadQuote() {
   if (!selectedAddressId.value || !cartToken.value) return
   try {
+    serviceability.value = await checkServiceability({ restaurantId: selectedRestaurant.value.restaurant_id, addressId: selectedAddressId.value })
+    if (!serviceability.value.serviceable) {
+      quote.value = null
+      errorMessage.value = serviceability.value.reason
+      return
+    }
     quote.value = await quoteOrder({ cartToken: cartToken.value, addressId: selectedAddressId.value })
   } catch (error) {
     quote.value = null
+    serviceability.value = null
     errorMessage.value = toErrorMessage(error, 'We could not calculate delivery for this address.')
   }
 }
@@ -417,6 +427,9 @@ onMounted(async () => {
 .address-form { margin-top: 1rem; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .muted-copy { color: rgba(var(--v-theme-on-surface), .68); font-size: .9rem; }
+.serviceability-note { margin: .75rem 0; padding: .7rem; border-radius: 10px; background: rgba(34, 197, 94, .1); color: rgb(var(--v-theme-success-darken-1)); font-size: .86rem; }
+.serviceability-warning { margin: .75rem 0; padding: .8rem; border: 1px solid rgba(220, 38, 38, .25); border-radius: 10px; background: rgba(220, 38, 38, .08); color: rgb(var(--v-theme-error-darken-1)); }
+.serviceability-warning p { margin: .25rem 0 0; font-size: .86rem; }
 .summary-line { display: grid; grid-template-columns: 1fr auto; gap: .3rem .75rem; padding: .65rem 0; border-bottom: 1px solid rgb(var(--v-theme-surface-variant)); }
 .remove-link { grid-column: 1 / -1; justify-self: start; font-size: .8rem; }
 .summary-total { display: grid; grid-template-columns: 1fr auto; gap: .6rem; padding: 1rem 0 1.25rem; }

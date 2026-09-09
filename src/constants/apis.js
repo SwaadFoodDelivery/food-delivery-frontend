@@ -50,6 +50,7 @@ export const API_URLS = {
   CART_BY_TOKEN: '/cart/:cartToken',
   CART_ITEM: '/cart/:cartToken/items/:cartItemId',
   ORDER_QUOTE: '/orders/quote',
+  ORDER_SERVICEABILITY: '/orders/serviceability',
   ORDERS: '/orders',
   ORDER_HISTORY: '/orders/:orderId/history',
   ORDER_CANCEL: '/orders/:orderId/cancel',

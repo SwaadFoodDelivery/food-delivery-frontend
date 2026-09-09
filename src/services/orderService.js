@@ -15,6 +15,14 @@ export function quoteOrder({ cartToken, addressId }) {
   })
 }
 
+export function checkServiceability({ restaurantId, addressId }) {
+  return request(API_URLS.ORDER_SERVICEABILITY, {
+    method: HTTP_METHODS.POST,
+    authMode: AUTH_MODE.BEARER,
+    body: { restaurant_id: restaurantId, address_id: addressId }
+  })
+}
+
 export function placeOrder({ cartToken, addressId, paymentMethod = 'upi', instructions = '' }) {
   return request(API_URLS.ORDERS, {
     method: HTTP_METHODS.POST,
