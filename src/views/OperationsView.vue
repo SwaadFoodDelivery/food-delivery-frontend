@@ -86,7 +86,9 @@ const metrics = computed(() => {
     { label: 'Orders tracked', value: summary.total_orders || 0, hint: 'All demo orders' },
     { label: 'Active orders', value: summary.active_orders || 0, hint: 'Needs attention' },
     { label: 'Delivered', value: summary.delivered_orders || 0, hint: 'Completed journeys' },
-    { label: 'Drivers ready', value: `${summary.available_drivers || 0}/${overview.value?.drivers?.length || 0}`, hint: `${summary.active_drivers || 0} currently assigned` }
+    { label: 'Drivers ready', value: `${summary.available_drivers || 0}/${overview.value?.drivers?.length || 0}`, hint: `${summary.active_drivers || 0} currently assigned` },
+    { label: 'Failed payments', value: summary.failed_payments || 0, hint: 'Mock outcomes needing retry' },
+    { label: 'Stalled deliveries', value: summary.stalled_deliveries || 0, hint: 'Due transitions to reconcile' }
   ]
 })
 
