@@ -2,7 +2,7 @@ import MockAdapter from 'axios-mock-adapter'
 
 import http, { configureApi } from '@/services/api'
 import { API_URLS } from '@/constants/apis'
-import { payForOrder, placeOrder, quoteOrder } from '@/services/orderService'
+import { checkServiceability, payForOrder, placeOrder, quoteOrder } from '@/services/orderService'
 
 jest.mock('@/utils/device', () => ({ getDeviceId: () => 'device-123' }))
 jest.mock('@/utils/logger', () => ({ auth: jest.fn(), error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
@@ -40,5 +40,14 @@ describe('orderService', () => {
 
     await placeOrder({ cartToken: 'cart-1', addressId: 'address-1' })
     await expect(payForOrder({ orderId: 'order-1' })).resolves.toEqual({ status: 'success' })
+  })
+
+  it('checks serviceability before checkout quote', async () => {
+    mock.onPost(API_URLS.ORDER_SERVICEABILITY).reply((config) => {
+      expect(JSON.parse(config.data)).toEqual({ restaurant_id: 'restaurant-1', address_id: 'address-1' })
+      return [200, { status: 'success', data: { serviceable: true, delivery_fee_minor: 3500, estimated_delivery_min: 42 } }]
+    })
+
+    await expect(checkServiceability({ restaurantId: 'restaurant-1', addressId: 'address-1' })).resolves.toEqual({ serviceable: true, delivery_fee_minor: 3500, estimated_delivery_min: 42 })
   })
 })
