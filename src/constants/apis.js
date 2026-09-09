@@ -25,6 +25,42 @@ export const API_URLS = {
   // Profile (protected).
   PROFILE_ME: '/users/me/profile',
 
+  // Mock delivery tracking (protected). The backend labels this simulation
+  // explicitly; it does not represent live courier GPS or dispatch.
+  ORDER_DELIVERY: '/orders/:orderId/delivery',
+  DRIVER_DELIVERY: '/driver/delivery',
+  DRIVER_DELIVERY_STATUS: '/driver/delivery/status',
+
+  // Restaurant-manager operations workspace.
+  OPERATIONS_OVERVIEW: '/operations/overview',
+  OPERATIONS_AUDIT: '/operations/audit',
+  OPERATIONS_CANCEL_ORDER: '/operations/orders/:orderId/cancel',
+  OPERATIONS_ONBOARDING: '/operations/onboarding',
+  OPERATIONS_ONBOARDING_REVIEW: '/operations/onboarding/:id',
+
+  // Recipient-scoped in-app notifications.
+  NOTIFICATIONS: '/notifications',
+  NOTIFICATION_READ: '/notifications/:notificationId/read',
+  NOTIFICATIONS_READ_ALL: '/notifications/read-all',
+
+  // Customer ordering journey.
+  RESTAURANTS: '/restaurants',
+  RESTAURANT_MENU: '/restaurants/:restaurantId/menu',
+  CART: '/cart',
+  CART_BY_TOKEN: '/cart/:cartToken',
+  CART_ITEM: '/cart/:cartToken/items/:cartItemId',
+  ORDER_QUOTE: '/orders/quote',
+  ORDERS: '/orders',
+  ORDER_HISTORY: '/orders/:orderId/history',
+  ORDER_CANCEL: '/orders/:orderId/cancel',
+  ORDER_PAYMENT: '/orders/:orderId/payment',
+  ADDRESSES: '/users/me/addresses',
+
+  // Restaurant-owner operations.
+  OWNER_RESTAURANT: '/owner/restaurant',
+  OWNER_RESTAURANT_ORDERS: '/restaurants/:restaurantId/orders',
+  OWNER_ORDER_STATUS: '/restaurants/:restaurantId/orders/:orderId/status',
+
   // Onboarding (protected, except the upload callback which is public).
   ONBOARDING_INIT: '/onboarding/role/init',
   ONBOARDING_SUBMIT: '/onboarding/:id/submit',

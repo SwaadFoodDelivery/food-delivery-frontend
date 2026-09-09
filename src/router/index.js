@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
+import { ROLES } from '@/constants/auth'
 import { ROUTE_NAMES, ROUTE_PATHS } from '@/constants/routes'
 import { useAuthStore } from '@/stores/auth'
 import { resolvePostAuthRoute } from '@/utils/navigation'
@@ -32,6 +33,48 @@ const routes = [
     path: ROUTE_PATHS[ROUTE_NAMES.PROFILE],
     name: ROUTE_NAMES.PROFILE,
     component: () => import('@/views/ProfileView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.ORDER],
+    name: ROUTE_NAMES.ORDER,
+    component: () => import('@/views/CustomerOrderView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.ORDER_HISTORY],
+    name: ROUTE_NAMES.ORDER_HISTORY,
+    component: () => import('@/views/OrderHistoryView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.TRACKING],
+    name: ROUTE_NAMES.TRACKING,
+    component: () => import('@/views/DeliveryTrackingView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.RESTAURANT_ORDERS],
+    name: ROUTE_NAMES.RESTAURANT_ORDERS,
+    component: () => import('@/views/RestaurantOrdersView.vue'),
+    meta: { requiresAuth: true, roles: [ROLES.RESTAURANT_OWNER] }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.DRIVER],
+    name: ROUTE_NAMES.DRIVER,
+    component: () => import('@/views/DriverView.vue'),
+    meta: { requiresAuth: true, roles: [ROLES.DRIVER] }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.OPERATIONS],
+    name: ROUTE_NAMES.OPERATIONS,
+    component: () => import('@/views/OperationsView.vue'),
+    meta: { requiresAuth: true, roles: [ROLES.RESTAURANT_MANAGER] }
+  },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.NOTIFICATIONS],
+    name: ROUTE_NAMES.NOTIFICATIONS,
+    component: () => import('@/views/NotificationsView.vue'),
     meta: { requiresAuth: true }
   },
   { path: '/:pathMatch(.*)*', redirect: { name: ROUTE_NAMES.LANDING } }
@@ -83,6 +126,10 @@ router.beforeEach(async (to) => {
 
   // …and returning users cannot enter it.
   if (!auth.needsOnboarding && to.name === ROUTE_NAMES.ONBOARDING) {
+    return { name: ROUTE_NAMES.LANDING }
+  }
+
+  if (to.meta.roles?.length && !to.meta.roles.includes(auth.role)) {
     return { name: ROUTE_NAMES.LANDING }
   }
 

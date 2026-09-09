@@ -23,6 +23,12 @@
         <p class="landing__subtext">{{ VERIFICATION_STATUS_MESSAGE }}</p>
       </template>
       <h1 v-else class="landing__welcome">Welcome people</h1>
+      <div class="landing__actions">
+        <button type="button" class="landing__order" @click="onStartOrdering">
+          {{ primaryActionLabel }}
+          <v-icon icon="mdi-arrow-right" size="18" aria-hidden="true" />
+        </button>
+      </div>
     </main>
   </div>
 </template>
@@ -32,6 +38,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import { ROLES } from '@/constants/auth'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { VERIFICATION_STATUS_MESSAGE } from '@/constants/profile'
 
@@ -41,9 +48,35 @@ const auth = useAuthStore()
 const initial = computed(() => auth.displayName.trim().charAt(0).toUpperCase())
 
 const actionLabel = computed(() => (auth.isAuthenticated ? 'View profile' : 'Sign in'))
+const isRestaurantOwner = computed(() => auth.role === ROLES.RESTAURANT_OWNER)
+const isDriver = computed(() => auth.role === ROLES.DRIVER)
+const isOperations = computed(() => auth.role === ROLES.RESTAURANT_MANAGER)
+const primaryActionLabel = computed(() => {
+  if (!auth.isAuthenticated) return 'Sign in to order'
+  if (isRestaurantOwner.value) return 'Open restaurant orders'
+  if (isDriver.value) return 'Open driver dashboard'
+  if (isOperations.value) return 'Open operations workspace'
+  return 'Browse Shamgarh kitchens'
+})
 
 function onOpenProfile() {
   router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.PROFILE : ROUTE_NAMES.LOGIN })
+}
+
+function onStartOrdering() {
+  if (isRestaurantOwner.value) {
+    router.push({ name: ROUTE_NAMES.RESTAURANT_ORDERS })
+    return
+  }
+  if (isDriver.value) {
+    router.push({ name: ROUTE_NAMES.DRIVER })
+    return
+  }
+  if (isOperations.value) {
+    router.push({ name: ROUTE_NAMES.OPERATIONS })
+    return
+  }
+  router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.ORDER : ROUTE_NAMES.LOGIN, query: auth.isAuthenticated ? {} : { redirect: '/order' } })
 }
 </script>
 
@@ -108,6 +141,30 @@ function onOpenProfile() {
   margin: 0.75rem 0 0;
   font-size: 1rem;
   color: rgba(var(--v-theme-on-surface), var(--v-medium-emphasis-opacity));
+}
+
+.landing__actions {
+  margin-top: 1.5rem;
+}
+
+.landing__order {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 46px;
+  padding: 0 1.2rem;
+  border: 0;
+  border-radius: 14px;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.landing__order:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-info));
+  outline-offset: 2px;
 }
 
 @media (min-width: 600px) {

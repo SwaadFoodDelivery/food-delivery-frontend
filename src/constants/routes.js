@@ -4,7 +4,14 @@ export const ROUTE_NAMES = {
   REGISTER: 'register',
   ONBOARDING: 'onboarding',
   LANDING: 'landing',
-  PROFILE: 'profile'
+  PROFILE: 'profile',
+  ORDER: 'order',
+  ORDER_HISTORY: 'order-history',
+  TRACKING: 'tracking',
+  RESTAURANT_ORDERS: 'restaurant-orders',
+  DRIVER: 'driver',
+  OPERATIONS: 'operations',
+  NOTIFICATIONS: 'notifications'
 }
 
 export const ROUTE_PATHS = {
@@ -12,5 +19,12 @@ export const ROUTE_PATHS = {
   [ROUTE_NAMES.REGISTER]: '/register',
   [ROUTE_NAMES.ONBOARDING]: '/onboarding',
   [ROUTE_NAMES.LANDING]: '/',
-  [ROUTE_NAMES.PROFILE]: '/profile'
+  [ROUTE_NAMES.PROFILE]: '/profile',
+  [ROUTE_NAMES.ORDER]: '/order',
+  [ROUTE_NAMES.ORDER_HISTORY]: '/orders/history',
+  [ROUTE_NAMES.TRACKING]: '/orders/:orderId/tracking',
+  [ROUTE_NAMES.RESTAURANT_ORDERS]: '/restaurant/orders',
+  [ROUTE_NAMES.DRIVER]: '/driver',
+  [ROUTE_NAMES.OPERATIONS]: '/operations',
+  [ROUTE_NAMES.NOTIFICATIONS]: '/notifications'
 }
