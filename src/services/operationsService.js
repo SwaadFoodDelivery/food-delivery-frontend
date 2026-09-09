@@ -9,6 +9,13 @@ export function getOperationsOverview(status = '') {
   })
 }
 
+export function getOperationsAudit({ action = '', entityType = '', limit = 50 } = {}) {
+  return request(API_URLS.OPERATIONS_AUDIT, {
+    authMode: AUTH_MODE.BEARER,
+    query: { ...(action ? { action } : {}), ...(entityType ? { entity_type: entityType } : {}), limit }
+  })
+}
+
 export function cancelOperationsOrder(orderId) {
   return request(API_URLS.OPERATIONS_CANCEL_ORDER, {
     method: HTTP_METHODS.PATCH,

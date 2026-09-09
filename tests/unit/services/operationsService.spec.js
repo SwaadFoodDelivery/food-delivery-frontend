@@ -2,7 +2,7 @@ import MockAdapter from 'axios-mock-adapter'
 
 import http, { configureApi } from '@/services/api'
 import { API_URLS } from '@/constants/apis'
-import { cancelOperationsOrder, getOnboardingReviews, getOperationsOverview, reviewOnboarding } from '@/services/operationsService'
+import { cancelOperationsOrder, getOnboardingReviews, getOperationsAudit, getOperationsOverview, reviewOnboarding } from '@/services/operationsService'
 
 jest.mock('@/utils/device', () => ({ getDeviceId: () => 'device-123' }))
 jest.mock('@/utils/logger', () => ({ auth: jest.fn(), error: jest.fn(), warn: jest.fn(), info: jest.fn() }))
@@ -48,5 +48,14 @@ describe('operationsService', () => {
 
     await expect(getOnboardingReviews('pending_verification')).resolves.toEqual({ items: [{ onboarding_id: 'onboarding-1' }] })
     await expect(reviewOnboarding('onboarding-1', 'rejected', 'Upload a clearer license')).resolves.toEqual({ onboarding_id: 'onboarding-1', status: 'rejected' })
+  })
+
+  it('loads filtered operations audit events', async () => {
+    mock.onGet(API_URLS.OPERATIONS_AUDIT).reply((config) => {
+      expect(config.params).toEqual({ action: 'onboarding_approved', entity_type: 'onboardings', limit: 20 })
+      return [200, { status: 'success', data: { items: [{ action: 'onboarding_approved' }] } }]
+    })
+
+    await expect(getOperationsAudit({ action: 'onboarding_approved', entityType: 'onboardings', limit: 20 })).resolves.toEqual({ items: [{ action: 'onboarding_approved' }] })
   })
 })

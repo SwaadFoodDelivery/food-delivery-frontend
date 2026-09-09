@@ -75,6 +75,19 @@
             </v-card>
           </div>
         </section>
+
+        <section class="operations-section" aria-labelledby="audit-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">Traceability</p><h2 id="audit-title">Recent audit events</h2></div>
+            <v-select v-model="auditActionFilter" :items="auditActionOptions" label="Filter events" hide-details density="compact" class="status-filter" @update:model-value="load" />
+          </div>
+          <div v-if="auditEvents.length === 0" class="empty-state"><v-icon icon="mdi-history" size="42" aria-hidden="true" /><p>No audit events match this filter.</p></div>
+          <div v-else class="audit-list">
+            <v-card v-for="event in auditEvents" :key="`${event.audit_id}-${event.occurred_at}`" class="audit-row">
+              <v-card-text class="audit-row__content"><div><strong>{{ statusLabel(event.action) }}</strong><span>{{ statusLabel(event.entity_type) }} · {{ shortId(event.entity_id) }}</span></div><div><v-chip size="small" variant="tonal">{{ statusLabel(event.actor_role) || 'System' }}</v-chip><small>{{ formatTime(event.occurred_at) }}</small></div><details v-if="event.before || event.after"><summary>View state change</summary><code>{{ event.before || '{}' }} → {{ event.after || '{}' }}</code></details></v-card-text>
+            </v-card>
+          </div>
+        </section>
       </template>
     </main>
   </div>
@@ -87,7 +100,7 @@ import { useRouter } from 'vue-router'
 import AppButton from '@/components/common/AppButton.vue'
 import FormAlert from '@/components/common/FormAlert.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { cancelOperationsOrder, getOnboardingReviews, getOperationsOverview, reviewOnboarding } from '@/services/operationsService'
+import { cancelOperationsOrder, getOnboardingReviews, getOperationsAudit, getOperationsOverview, reviewOnboarding } from '@/services/operationsService'
 import { toErrorMessage } from '@/utils/errors'
 
 const router = useRouter()
@@ -102,6 +115,9 @@ const onboardingStatusFilter = ref('pending_verification')
 const onboardingStatusOptions = [{ title: 'Pending review', value: 'pending_verification' }, { title: 'Approved', value: 'approved' }, { title: 'Rejected', value: 'rejected' }, { title: 'All applications', value: '' }]
 const rejectionReasons = ref({})
 const reviewingOnboardingId = ref('')
+const auditEvents = ref([])
+const auditActionFilter = ref('')
+const auditActionOptions = [{ title: 'All events', value: '' }, 'ops_order_cancelled', 'onboarding_approved', 'onboarding_rejected', 'onboarding_submit', 'onboarding_resubmit']
 const statusOptions = [{ title: 'All orders', value: '' }, 'order_created', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled', 'rejected']
 
 const metrics = computed(() => {
@@ -129,9 +145,10 @@ async function load() {
   loading.value = true
   clearMessages()
   try {
-    const [nextOverview, nextReviews] = await Promise.all([getOperationsOverview(statusFilter.value), getOnboardingReviews(onboardingStatusFilter.value)])
+    const [nextOverview, nextReviews, nextAudit] = await Promise.all([getOperationsOverview(statusFilter.value), getOnboardingReviews(onboardingStatusFilter.value), getOperationsAudit({ action: auditActionFilter.value })])
     overview.value = nextOverview
     onboardingReviews.value = nextReviews.items || []
+    auditEvents.value = nextAudit.items || []
   } catch (error) { errorMessage.value = toErrorMessage(error, 'The operations workspace could not be loaded.') } finally { loading.value = false }
 }
 
@@ -191,6 +208,14 @@ onMounted(load)
 .review-card__identity span, .review-card__identity small, .review-card__reason { color: rgba(var(--v-theme-on-background), .65); font-size: .84rem; }
 .review-card__actions { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; align-items: center; }
 .review-card__reason { margin: .75rem 0 0; grid-column: 1 / -1; }
+.audit-list { display: grid; gap: .65rem; margin-top: 1rem; }
+.audit-row { border: 1px solid rgba(var(--v-theme-on-background), .08); }
+.audit-row__content { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1rem; }
+.audit-row__content > div { display: flex; flex-direction: column; gap: .25rem; }
+.audit-row__content span, .audit-row__content small { color: rgba(var(--v-theme-on-background), .65); font-size: .84rem; }
+.audit-row__content details { grid-column: 1 / -1; color: rgba(var(--v-theme-on-background), .7); }
+.audit-row__content summary { cursor: pointer; font-size: .82rem; }
+.audit-row__content code { display: block; overflow-wrap: anywhere; margin-top: .35rem; font-size: .75rem; }
 .operations-skeleton { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 2rem; }
 @media (max-width: 800px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } .order-row__content, .review-card__content { grid-template-columns: 1fr 1fr; } .order-row__amount { align-items: start; } .review-card__actions { grid-column: 1 / -1; } }
 @media (max-width: 600px) { .operations-page__bar, .operations-page__intro, .section-heading { align-items: stretch; flex-direction: column; } .summary-grid, .operations-skeleton { grid-template-columns: 1fr 1fr; } .status-filter { width: 100%; } }
