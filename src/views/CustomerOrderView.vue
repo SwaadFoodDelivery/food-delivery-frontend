@@ -281,7 +281,12 @@ async function removeItem(cartItemId) {
   try {
     await removeCartItem(cartToken.value, cartItemId)
     await refreshCart()
-    if (!cartItemCount.value) quote.value = null
+    if (!cartItemCount.value) {
+      quote.value = null
+      serviceability.value = null
+    } else if (selectedAddressId.value) {
+      await loadQuote()
+    }
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'That item could not be removed.')
   }
