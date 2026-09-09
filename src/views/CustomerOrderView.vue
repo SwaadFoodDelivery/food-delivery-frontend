@@ -25,6 +25,19 @@
       <FormAlert v-if="successMessage" :message="successMessage" type="success" />
 
       <section v-if="step === 1" aria-labelledby="restaurants-title">
+        <div class="discovery-hero">
+          <div class="discovery-hero__copy">
+            <p class="eyebrow">Shamgarh on a plate</p>
+            <h2>Warm food, thoughtful delivery.</h2>
+            <p>A small fictional food world for learning, tasting, and exploring safely in demo mode.</p>
+          </div>
+          <div class="food-scene" role="img" aria-label="A stylized bowl of food floating above a warm saffron plate">
+            <div class="food-scene__halo" aria-hidden="true"></div>
+            <div class="food-scene__plate" aria-hidden="true"><span class="food-scene__rice"></span><span class="food-scene__leaf food-scene__leaf--one"></span><span class="food-scene__leaf food-scene__leaf--two"></span><span class="food-scene__spice"></span></div>
+            <span class="food-scene__steam food-scene__steam--one" aria-hidden="true"></span>
+            <span class="food-scene__steam food-scene__steam--two" aria-hidden="true"></span>
+          </div>
+        </div>
         <div class="section-heading">
           <div>
             <p class="eyebrow">Near you</p>
@@ -352,6 +365,23 @@ onMounted(async () => {
 .order-step { display: inline-flex; align-items: center; gap: .45rem; padding: .45rem .7rem; border-radius: 999px; background: rgb(var(--v-theme-surface-variant)); color: rgba(var(--v-theme-on-surface), .65); font-size: .85rem; }
 .order-step--active { background: rgb(var(--v-theme-primary)); color: white; }
 .order-step__number { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,.25); font-weight: 800; }
+.discovery-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, .65fr); align-items: center; gap: 1rem; min-height: 230px; margin-bottom: 2rem; padding: 1.5rem 2rem; overflow: hidden; border: 1px solid rgba(232, 93, 4, .18); border-radius: 28px; background: linear-gradient(110deg, rgba(255, 237, 213, .96), rgba(255, 247, 237, .98)); }
+.discovery-hero__copy { max-width: 540px; }
+.discovery-hero__copy h2 { margin: .35rem 0 .55rem; color: rgb(var(--v-theme-primary-darken-1)); font-size: clamp(1.75rem, 4vw, 3rem); line-height: 1.05; }
+.discovery-hero__copy p:last-child { max-width: 440px; margin: 0; color: rgba(var(--v-theme-on-surface), .72); }
+.food-scene { position: relative; min-height: 190px; perspective: 700px; isolation: isolate; }
+.food-scene__halo { position: absolute; inset: 20% 8% 8%; z-index: -1; border-radius: 50%; background: radial-gradient(circle, rgba(255, 186, 8, .38), rgba(255, 186, 8, 0) 68%); filter: blur(3px); }
+.food-scene__plate { position: absolute; top: 34%; left: 50%; width: 170px; height: 92px; transform: translate(-50%, -50%) rotateX(62deg) rotateZ(-12deg); border: 8px solid rgba(255, 255, 255, .72); border-radius: 50%; background: radial-gradient(ellipse at 48% 42%, #f97316 0 28%, #fb923c 29% 42%, #fed7aa 43% 58%, #ea580c 59% 66%, #fff7ed 67%); box-shadow: 0 24px 20px rgba(124, 45, 18, .2), inset 0 -10px 0 rgba(124, 45, 18, .15); animation: food-float 5s ease-in-out infinite; }
+.food-scene__rice { position: absolute; top: 23%; left: 31%; width: 48px; height: 30px; border-radius: 50%; background: #fff7ed; box-shadow: 12px -4px 0 #fffbeb, 20px 8px 0 #fff7ed, -10px 8px 0 #fffbeb; }
+.food-scene__leaf { position: absolute; width: 19px; height: 10px; border-radius: 100% 0 100% 0; background: #65a30d; }
+.food-scene__leaf--one { top: 28%; left: 67%; transform: rotate(28deg); }
+.food-scene__leaf--two { top: 47%; left: 22%; transform: rotate(-22deg); }
+.food-scene__spice { position: absolute; top: 43%; left: 55%; width: 10px; height: 10px; border-radius: 50%; background: #dc2626; box-shadow: 15px 4px 0 #facc15, -16px -4px 0 #facc15; }
+.food-scene__steam { position: absolute; top: 8%; width: 18px; height: 58px; border-left: 3px solid rgba(255, 255, 255, .75); border-radius: 50%; filter: blur(.2px); animation: steam-rise 3.5s ease-in-out infinite; }
+.food-scene__steam--one { left: 43%; transform: rotate(12deg); }
+.food-scene__steam--two { left: 58%; height: 45px; animation-delay: -1.3s; transform: rotate(-12deg); }
+@keyframes food-float { 0%, 100% { margin-top: 0; } 50% { margin-top: -9px; } }
+@keyframes steam-rise { 0%, 100% { opacity: .1; transform: translateY(8px) scale(.8) rotate(12deg); } 50% { opacity: .8; transform: translateY(-6px) scale(1) rotate(-8deg); } }
 .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin-bottom: 1.25rem; }
 .section-heading h2 { font-size: clamp(1.7rem, 4vw, 2.5rem); }
 .cuisine-select { max-width: 190px; }
@@ -395,11 +425,14 @@ onMounted(async () => {
 .empty-state h3 { margin: 0; }
 .empty-state p { margin: 0 0 .5rem; color: rgba(var(--v-theme-on-surface), .68); }
 @media (max-width: 700px) {
+  .discovery-hero { grid-template-columns: 1fr; padding: 1.25rem; }
+  .food-scene { min-height: 150px; }
+  .food-scene__plate { transform: translate(-50%, -50%) scale(.85) rotateX(62deg) rotateZ(-12deg); }
   .section-heading, .checkout-grid { display: block; }
   .cuisine-select { max-width: none; margin-top: 1rem; }
   .checkout-summary { margin-top: 1rem; }
   .menu-item { align-items: start; }
   .menu-item .app-button { flex: 0 0 auto; }
 }
-@media (prefers-reduced-motion: reduce) { .restaurant-card { transition: none; } .restaurant-card:hover { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .restaurant-card { transition: none; } .restaurant-card:hover { transform: none; } .food-scene__plate, .food-scene__steam { animation: none; } }
 </style>
