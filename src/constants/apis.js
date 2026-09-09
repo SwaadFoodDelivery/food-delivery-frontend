@@ -49,6 +49,7 @@ export const API_URLS = {
   ORDER_QUOTE: '/orders/quote',
   ORDERS: '/orders',
   ORDER_HISTORY: '/orders/:orderId/history',
+  ORDER_CANCEL: '/orders/:orderId/cancel',
   ORDER_PAYMENT: '/orders/:orderId/payment',
   ADDRESSES: '/users/me/addresses',
 

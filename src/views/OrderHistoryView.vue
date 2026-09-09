@@ -19,7 +19,10 @@
           <span :class="['history__status', `history__status--${order.status}`]">{{ label(order.delivery_status || order.status) }}</span>
         </div>
         <div class="history__meta"><span>{{ money(order.total_amount_minor) }}</span><span>{{ order.payment_method }}</span><span v-if="order.delivery_status">{{ label(order.delivery_status) }}</span></div>
-        <button type="button" class="history__details" @click="toggle(order)">{{ selectedId === order.order_id ? 'Hide timeline' : 'View timeline' }}</button>
+        <div class="history__actions">
+          <button type="button" class="history__details" @click="toggle(order)">{{ selectedId === order.order_id ? 'Hide timeline' : 'View timeline' }}</button>
+          <button v-if="canCancel(order)" type="button" class="history__cancel" @click="cancel(order)">Cancel demo order</button>
+        </div>
         <ol v-if="selectedId === order.order_id" class="history__timeline">
           <li v-for="event in timeline" :key="`${event.to_status}-${event.changed_at}`"><strong>{{ label(event.to_status) }}</strong><time :datetime="event.changed_at">{{ formatDate(event.changed_at) }}</time></li>
           <li v-if="!timeline.length" class="history__muted">No status transitions recorded yet.</li>
@@ -34,7 +37,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ROUTE_NAMES } from '@/constants/routes'
-import { getOrderHistory, listOrders } from '@/services/orderService'
+import { cancelOrder, getOrderHistory, listOrders } from '@/services/orderService'
 
 const router = useRouter()
 const orders = ref([])
@@ -46,6 +49,7 @@ const error = ref('')
 function money(minor = 0) { return `₹${(Number(minor) / 100).toFixed(2)}` }
 function formatDate(value) { return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) }
 function label(value = '') { return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()) }
+function canCancel(order) { return !['cancelled', 'rejected', 'delivered'].includes(order.status) }
 
 async function load() {
   try {
@@ -62,6 +66,15 @@ async function toggle(order) {
     selectedId.value = order.order_id
     timeline.value = result?.order_status || []
   } catch (caught) { error.value = caught?.message || 'Order timeline could not be loaded.' }
+}
+
+async function cancel(order) {
+  try {
+    await cancelOrder(order.order_id)
+    order.status = 'cancelled'
+    order.delivery_status = ''
+    if (selectedId.value === order.order_id) { timeline.value = []; selectedId.value = '' }
+  } catch (caught) { error.value = caught?.message || 'This order could not be cancelled.' }
 }
 
 load()
@@ -83,6 +96,8 @@ h1 { margin: 0; color: rgb(var(--v-theme-primary)); }
 .history__status--cancelled, .history__status--rejected { background: rgb(var(--v-theme-error)); color: rgb(var(--v-theme-on-error)); }
 .history__meta { justify-content: flex-start; margin: 1rem 0; color: rgba(var(--v-theme-on-background), var(--v-medium-emphasis-opacity)); font-size: .9rem; }
 .history__details { padding: .45rem .7rem; }
+.history__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.history__cancel { border: 1px solid rgb(var(--v-theme-error)); border-radius: 10px; background: transparent; color: rgb(var(--v-theme-error)); cursor: pointer; font: inherit; font-weight: 700; padding: .45rem .7rem; }
 .history__timeline { display: grid; gap: .5rem; margin: 1rem 0 0; padding-left: 1.25rem; }
 .history__timeline li { display: flex; justify-content: space-between; gap: 1rem; }
 .history__state, .history__error { border-radius: 12px; padding: 1rem; background: rgb(var(--v-theme-surface)); }

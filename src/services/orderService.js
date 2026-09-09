@@ -41,3 +41,7 @@ export function listOrders({ limit = 20 } = {}) {
 export function getOrderHistory(orderId) {
   return request(buildPath(API_URLS.ORDER_HISTORY, { orderId }), { authMode: AUTH_MODE.BEARER })
 }
+
+export function cancelOrder(orderId) {
+  return request(buildPath(API_URLS.ORDER_CANCEL, { orderId }), { method: HTTP_METHODS.PATCH, authMode: AUTH_MODE.BEARER })
+}
