@@ -31,6 +31,10 @@ export const API_URLS = {
   DRIVER_DELIVERY: '/driver/delivery',
   DRIVER_DELIVERY_STATUS: '/driver/delivery/status',
 
+  // Restaurant-manager operations workspace.
+  OPERATIONS_OVERVIEW: '/operations/overview',
+  OPERATIONS_CANCEL_ORDER: '/operations/orders/:orderId/cancel',
+
   // Customer ordering journey.
   RESTAURANTS: '/restaurants',
   RESTAURANT_MENU: '/restaurants/:restaurantId/menu',

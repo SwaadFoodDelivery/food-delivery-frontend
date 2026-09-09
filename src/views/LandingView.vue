@@ -50,10 +50,12 @@ const initial = computed(() => auth.displayName.trim().charAt(0).toUpperCase())
 const actionLabel = computed(() => (auth.isAuthenticated ? 'View profile' : 'Sign in'))
 const isRestaurantOwner = computed(() => auth.role === ROLES.RESTAURANT_OWNER)
 const isDriver = computed(() => auth.role === ROLES.DRIVER)
+const isOperations = computed(() => auth.role === ROLES.RESTAURANT_MANAGER)
 const primaryActionLabel = computed(() => {
   if (!auth.isAuthenticated) return 'Sign in to order'
   if (isRestaurantOwner.value) return 'Open restaurant orders'
   if (isDriver.value) return 'Open driver dashboard'
+  if (isOperations.value) return 'Open operations workspace'
   return 'Browse Shamgarh kitchens'
 })
 
@@ -68,6 +70,10 @@ function onStartOrdering() {
   }
   if (isDriver.value) {
     router.push({ name: ROUTE_NAMES.DRIVER })
+    return
+  }
+  if (isOperations.value) {
+    router.push({ name: ROUTE_NAMES.OPERATIONS })
     return
   }
   router.push({ name: auth.isAuthenticated ? ROUTE_NAMES.ORDER : ROUTE_NAMES.LOGIN, query: auth.isAuthenticated ? {} : { redirect: '/order' } })

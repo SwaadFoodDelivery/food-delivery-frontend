@@ -8,7 +8,8 @@ export const ROUTE_NAMES = {
   ORDER: 'order',
   TRACKING: 'tracking',
   RESTAURANT_ORDERS: 'restaurant-orders',
-  DRIVER: 'driver'
+  DRIVER: 'driver',
+  OPERATIONS: 'operations'
 }
 
 export const ROUTE_PATHS = {
@@ -20,5 +21,6 @@ export const ROUTE_PATHS = {
   [ROUTE_NAMES.ORDER]: '/order',
   [ROUTE_NAMES.TRACKING]: '/orders/:orderId/tracking',
   [ROUTE_NAMES.RESTAURANT_ORDERS]: '/restaurant/orders',
-  [ROUTE_NAMES.DRIVER]: '/driver'
+  [ROUTE_NAMES.DRIVER]: '/driver',
+  [ROUTE_NAMES.OPERATIONS]: '/operations'
 }
