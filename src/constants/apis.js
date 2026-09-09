@@ -48,6 +48,7 @@ export const API_URLS = {
   CART_ITEM: '/cart/:cartToken/items/:cartItemId',
   ORDER_QUOTE: '/orders/quote',
   ORDERS: '/orders',
+  ORDER_HISTORY: '/orders/:orderId/history',
   ORDER_PAYMENT: '/orders/:orderId/payment',
   ADDRESSES: '/users/me/addresses',
 

@@ -1,4 +1,4 @@
-import { request } from '@/services/api'
+import { buildPath, request } from '@/services/api'
 import { API_URLS } from '@/constants/apis'
 import { AUTH_MODE, HTTP_METHODS } from '@/constants/common'
 
@@ -32,4 +32,12 @@ export function payForOrder({ orderId, paymentToken = 'demo-token' }) {
     headers: { 'Idempotency-Key': idempotencyKey('payment') },
     body: { payment_token: paymentToken }
   })
+}
+
+export function listOrders({ limit = 20 } = {}) {
+  return request(API_URLS.ORDERS, { authMode: AUTH_MODE.BEARER, query: { limit } })
+}
+
+export function getOrderHistory(orderId) {
+  return request(buildPath(API_URLS.ORDER_HISTORY, { orderId }), { authMode: AUTH_MODE.BEARER })
 }
