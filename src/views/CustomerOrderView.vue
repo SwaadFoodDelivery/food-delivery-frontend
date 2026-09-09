@@ -166,8 +166,9 @@
               <div v-if="serviceability && !serviceability.serviceable" class="serviceability-warning" role="alert"><strong>We can’t deliver to this address</strong><p>{{ serviceability.reason }}</p></div>
               <p v-else-if="serviceability" class="serviceability-note">{{ serviceability.reason }} · {{ serviceability.estimated_delivery_min }} min · {{ money(serviceability.delivery_fee_minor) }} delivery</p>
               <div v-if="quote" class="summary-total"><span>Subtotal</span><strong>{{ money(quote.subtotal_minor) }}</strong><span>Taxes</span><strong>{{ money(quote.taxes_minor) }}</strong><span>Delivery</span><strong>{{ money(quote.delivery_fee_minor) }}</strong><span class="summary-total__grand">Total</span><strong class="summary-total__grand">{{ money(quote.total_amount_minor) }}</strong></div>
+              <p v-else-if="quoteLoading" class="muted-copy">Calculating delivery for this address…</p>
               <p v-else-if="!serviceability" class="muted-copy">Choose an address to calculate your total.</p>
-              <AppButton block :loading="placingOrder" :disabled="!selectedAddressId || !quote || !cartItemCount" @click="placeDemoOrder">Place demo order</AppButton>
+              <AppButton block :loading="placingOrder" :disabled="quoteLoading || !selectedAddressId || !quote || !cartItemCount" @click="placeDemoOrder">Place demo order</AppButton>
             </v-card-text>
           </v-card>
         </div>
@@ -208,6 +209,8 @@ const addresses = ref([])
 const selectedAddressId = ref('')
 const quote = ref(null)
 const serviceability = ref(null)
+const quoteLoading = ref(false)
+let quoteRequestSequence = 0
 const showAddressForm = ref(false)
 const paymentMode = ref('success')
 const addressForm = reactive({ line1: '', area: '', city: 'Shamgarh', state: 'Madhya Pradesh', pincode: '458883', contact_phone: '' })
@@ -299,19 +302,36 @@ async function openCheckout() {
 }
 
 async function loadQuote() {
-  if (!selectedAddressId.value || !cartToken.value) return
+  const requestSequence = ++quoteRequestSequence
+  const addressId = selectedAddressId.value
+  const restaurantId = selectedRestaurant.value?.restaurant_id
+  const currentCartToken = cartToken.value
+  quote.value = null
+  serviceability.value = null
+  errorMessage.value = ''
+  if (!addressId || !currentCartToken || !restaurantId) {
+    quoteLoading.value = false
+    return
+  }
+  quoteLoading.value = true
   try {
-    serviceability.value = await checkServiceability({ restaurantId: selectedRestaurant.value.restaurant_id, addressId: selectedAddressId.value })
-    if (!serviceability.value.serviceable) {
-      quote.value = null
-      errorMessage.value = serviceability.value.reason
+    const nextServiceability = await checkServiceability({ restaurantId, addressId })
+    if (requestSequence !== quoteRequestSequence) return
+    serviceability.value = nextServiceability
+    if (!nextServiceability.serviceable) {
+      errorMessage.value = nextServiceability.reason
       return
     }
-    quote.value = await quoteOrder({ cartToken: cartToken.value, addressId: selectedAddressId.value })
+    const nextQuote = await quoteOrder({ cartToken: currentCartToken, addressId })
+    if (requestSequence !== quoteRequestSequence) return
+    quote.value = nextQuote
   } catch (error) {
+    if (requestSequence !== quoteRequestSequence) return
     quote.value = null
     serviceability.value = null
     errorMessage.value = toErrorMessage(error, 'We could not calculate delivery for this address.')
+  } finally {
+    if (requestSequence === quoteRequestSequence) quoteLoading.value = false
   }
 }
 
