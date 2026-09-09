@@ -1,4 +1,4 @@
-import { request, buildPath } from '@/services/api'
+import { request } from '@/services/api'
 import { getOrderHistory, listOrders } from '@/services/orderService'
 
 jest.mock('@/services/api', () => ({
