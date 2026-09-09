@@ -56,6 +56,25 @@
             </v-card>
           </div>
         </section>
+
+        <section class="operations-section" aria-labelledby="onboarding-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">Authorized support</p><h2 id="onboarding-title">Onboarding review queue</h2></div>
+            <v-select v-model="onboardingStatusFilter" :items="onboardingStatusOptions" label="Filter applications" hide-details density="compact" class="status-filter" @update:model-value="load" />
+          </div>
+          <p class="section-note">This demo queue models document review without a real delivery provider or external verification service.</p>
+          <div v-if="onboardingReviews.length === 0" class="empty-state"><v-icon icon="mdi-file-check-outline" size="42" aria-hidden="true" /><p>No onboarding applications match this filter.</p></div>
+          <div v-else class="review-list">
+            <v-card v-for="item in onboardingReviews" :key="item.onboarding_id" class="review-card">
+              <v-card-text class="review-card__content">
+                <div class="review-card__identity"><strong>{{ item.user_name }}</strong><span>{{ statusLabel(item.role) }} · {{ item.phone }}</span><small>{{ item.email || 'No email provided' }} · {{ formatTime(item.created_at) }}</small></div>
+                <div class="review-card__documents"><v-chip :color="item.uploaded_documents === item.required_documents && item.required_documents > 0 ? 'success' : 'warning'" size="small" variant="tonal">{{ item.uploaded_documents }}/{{ item.required_documents }} documents</v-chip><v-chip :color="statusColor(item.status)" size="small" variant="tonal">{{ statusLabel(item.status) }}</v-chip></div>
+                <div v-if="item.status === 'pending_verification'" class="review-card__actions"><v-text-field v-model="rejectionReasons[item.onboarding_id]" label="Rejection feedback (if needed)" density="compact" hide-details /><AppButton variant="secondary" :loading="reviewingOnboardingId === item.onboarding_id" :disabled="Boolean(reviewingOnboardingId)" @click="reviewApplication(item, 'approved')">Approve</AppButton><AppButton variant="ghost" :loading="reviewingOnboardingId === item.onboarding_id" :disabled="Boolean(reviewingOnboardingId)" @click="reviewApplication(item, 'rejected')">Reject</AppButton></div>
+                <p v-else-if="item.rejection_reason" class="review-card__reason">Feedback: {{ item.rejection_reason }}</p>
+              </v-card-text>
+            </v-card>
+          </div>
+        </section>
       </template>
     </main>
   </div>
@@ -68,7 +87,7 @@ import { useRouter } from 'vue-router'
 import AppButton from '@/components/common/AppButton.vue'
 import FormAlert from '@/components/common/FormAlert.vue'
 import { ROUTE_NAMES } from '@/constants/routes'
-import { cancelOperationsOrder, getOperationsOverview } from '@/services/operationsService'
+import { cancelOperationsOrder, getOnboardingReviews, getOperationsOverview, reviewOnboarding } from '@/services/operationsService'
 import { toErrorMessage } from '@/utils/errors'
 
 const router = useRouter()
@@ -78,6 +97,11 @@ const statusFilter = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const cancellingOrderId = ref('')
+const onboardingReviews = ref([])
+const onboardingStatusFilter = ref('pending_verification')
+const onboardingStatusOptions = [{ title: 'Pending review', value: 'pending_verification' }, { title: 'Approved', value: 'approved' }, { title: 'Rejected', value: 'rejected' }, { title: 'All applications', value: '' }]
+const rejectionReasons = ref({})
+const reviewingOnboardingId = ref('')
 const statusOptions = [{ title: 'All orders', value: '' }, 'order_created', 'confirmed', 'preparing', 'ready_for_pickup', 'out_for_delivery', 'delivered', 'cancelled', 'rejected']
 
 const metrics = computed(() => {
@@ -104,13 +128,28 @@ function clearMessages() { errorMessage.value = ''; successMessage.value = '' }
 async function load() {
   loading.value = true
   clearMessages()
-  try { overview.value = await getOperationsOverview(statusFilter.value) } catch (error) { errorMessage.value = toErrorMessage(error, 'The operations overview could not be loaded.') } finally { loading.value = false }
+  try {
+    const [nextOverview, nextReviews] = await Promise.all([getOperationsOverview(statusFilter.value), getOnboardingReviews(onboardingStatusFilter.value)])
+    overview.value = nextOverview
+    onboardingReviews.value = nextReviews.items || []
+  } catch (error) { errorMessage.value = toErrorMessage(error, 'The operations workspace could not be loaded.') } finally { loading.value = false }
 }
 
 async function cancelOrder(order) {
   cancellingOrderId.value = order.order_id
   clearMessages()
   try { await cancelOperationsOrder(order.order_id); successMessage.value = `Order ${shortId(order.order_id)} was cancelled in the demo.`; await load() } catch (error) { errorMessage.value = toErrorMessage(error, 'That order could not be cancelled.') } finally { cancellingOrderId.value = '' }
+}
+
+async function reviewApplication(item, status) {
+  const reason = (rejectionReasons.value[item.onboarding_id] || '').trim()
+  if (status === 'rejected' && reason.length < 3) {
+    errorMessage.value = 'Add at least three characters of feedback before rejecting an application.'
+    return
+  }
+  reviewingOnboardingId.value = item.onboarding_id
+  clearMessages()
+  try { await reviewOnboarding(item.onboarding_id, status, reason); successMessage.value = `${item.user_name} was ${status === 'approved' ? 'approved' : 'sent back for changes'} in the demo.`; await load() } catch (error) { errorMessage.value = toErrorMessage(error, 'That onboarding decision could not be saved.') } finally { reviewingOnboardingId.value = '' }
 }
 
 onMounted(load)
@@ -144,8 +183,16 @@ onMounted(load)
 .driver-card p { margin: .7rem 0 .25rem; color: rgba(var(--v-theme-on-background), .72); }
 .driver-card small { color: rgba(var(--v-theme-on-background), .62); }
 .empty-state { display: grid; justify-items: center; gap: .5rem; padding: 2rem; color: rgba(var(--v-theme-on-background), .65); }
+.section-note { margin: .6rem 0 0; color: rgba(var(--v-theme-on-background), .65); font-size: .9rem; }
+.review-list { display: grid; gap: .65rem; margin-top: 1rem; }
+.review-card { border: 1px solid rgba(var(--v-theme-on-background), .08); }
+.review-card__content { display: grid; grid-template-columns: 1.2fr .8fr 1.8fr; align-items: center; gap: 1rem; }
+.review-card__identity, .review-card__documents, .review-card__actions { display: flex; flex-direction: column; gap: .3rem; }
+.review-card__identity span, .review-card__identity small, .review-card__reason { color: rgba(var(--v-theme-on-background), .65); font-size: .84rem; }
+.review-card__actions { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto; align-items: center; }
+.review-card__reason { margin: .75rem 0 0; grid-column: 1 / -1; }
 .operations-skeleton { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 2rem; }
-@media (max-width: 800px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } .order-row__content { grid-template-columns: 1fr 1fr; } .order-row__amount { align-items: start; } }
+@media (max-width: 800px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } .order-row__content, .review-card__content { grid-template-columns: 1fr 1fr; } .order-row__amount { align-items: start; } .review-card__actions { grid-column: 1 / -1; } }
 @media (max-width: 600px) { .operations-page__bar, .operations-page__intro, .section-heading { align-items: stretch; flex-direction: column; } .summary-grid, .operations-skeleton { grid-template-columns: 1fr 1fr; } .status-filter { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { * { transition-duration: .01ms !important; } }
 </style>

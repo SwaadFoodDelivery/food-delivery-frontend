@@ -34,6 +34,8 @@ export const API_URLS = {
   // Restaurant-manager operations workspace.
   OPERATIONS_OVERVIEW: '/operations/overview',
   OPERATIONS_CANCEL_ORDER: '/operations/orders/:orderId/cancel',
+  OPERATIONS_ONBOARDING: '/operations/onboarding',
+  OPERATIONS_ONBOARDING_REVIEW: '/operations/onboarding/:id',
 
   // Recipient-scoped in-app notifications.
   NOTIFICATIONS: '/notifications',
