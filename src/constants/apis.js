@@ -35,6 +35,11 @@ export const API_URLS = {
   OPERATIONS_OVERVIEW: '/operations/overview',
   OPERATIONS_CANCEL_ORDER: '/operations/orders/:orderId/cancel',
 
+  // Recipient-scoped in-app notifications.
+  NOTIFICATIONS: '/notifications',
+  NOTIFICATION_READ: '/notifications/:notificationId/read',
+  NOTIFICATIONS_READ_ALL: '/notifications/read-all',
+
   // Customer ordering journey.
   RESTAURANTS: '/restaurants',
   RESTAURANT_MENU: '/restaurants/:restaurantId/menu',

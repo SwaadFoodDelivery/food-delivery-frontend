@@ -65,6 +65,12 @@ const routes = [
     component: () => import('@/views/OperationsView.vue'),
     meta: { requiresAuth: true, roles: [ROLES.RESTAURANT_MANAGER] }
   },
+  {
+    path: ROUTE_PATHS[ROUTE_NAMES.NOTIFICATIONS],
+    name: ROUTE_NAMES.NOTIFICATIONS,
+    component: () => import('@/views/NotificationsView.vue'),
+    meta: { requiresAuth: true }
+  },
   { path: '/:pathMatch(.*)*', redirect: { name: ROUTE_NAMES.LANDING } }
 ]
 
