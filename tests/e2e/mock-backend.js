@@ -88,6 +88,7 @@ const test = base.extend({
           if (body.payment_token === 'mock_fail') return await fail(402, 'PAYMENT_FAILED', 'Demo payment declined')
           return await reply({ order_id: 'mock-order', status: 'success' })
         }
+        if (path === '/orders/mock-order/cancel' && request.method() === 'PATCH') return await reply({ order_id: 'mock-order', status: 'cancelled' })
         if (path === '/orders/mock-order/delivery') return await reply({ order_id: 'mock-order', provider: 'mock', status: ++state.deliveryReads > 1 ? 'delivered' : 'assigned', demo_label: 'Network-mocked demo delivery — no real courier', partner_name: 'Demo courier fixture', partner_phone: 'Not a real contact', updated_at: '2026-09-11T10:00:00Z' })
         state.unexpected.push(`${request.method()} ${path}`)
         return await fail(501, 'UNEXPECTED_MOCK_REQUEST', 'Missing deterministic fixture')

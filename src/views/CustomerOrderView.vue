@@ -33,6 +33,7 @@
           <v-radio label="Simulate a declined payment" value="decline" />
         </v-radio-group>
         <AppButton :loading="placingOrder" :disabled="placingOrder" @click="placeDemoOrder">Retry demo payment</AppButton>
+        <AppButton variant="secondary" :disabled="placingOrder" @click="cancelPendingPayment">Cancel saved order</AppButton>
         <AppButton variant="ghost" @click="router.push({ name: ROUTE_NAMES.ORDER_HISTORY })">View order history</AppButton>
       </section>
       <section v-else-if="step === 1" aria-labelledby="restaurants-title">
@@ -198,7 +199,7 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { listRestaurants, getRestaurantMenu } from '@/services/catalogService'
 import { addCartItem, getCart, removeCartItem } from '@/services/cartService'
 import { listAddresses, createAddress } from '@/services/addressService'
-import { checkServiceability, quoteOrder, placeOrder, payForOrder } from '@/services/orderService'
+import { checkServiceability, quoteOrder, placeOrder, payForOrder, cancelOrder } from '@/services/orderService'
 import { toErrorMessage } from '@/utils/errors'
 import { ApiError } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -423,6 +424,23 @@ async function placeDemoOrder() {
     router.push({ name: ROUTE_NAMES.TRACKING, params: { orderId } })
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'The demo order could not be completed.')
+  } finally {
+    placingOrder.value = false
+  }
+}
+
+async function cancelPendingPayment() {
+  if (placingOrder.value || !pendingPayment.value) return
+  placingOrder.value = true
+  clearMessages()
+  try {
+    await cancelOrder(pendingPayment.value.orderId)
+    pendingPayment.value = null
+    removeSessionValue(pendingPaymentKey)
+    step.value = 1
+    successMessage.value = 'Your saved order was cancelled. You can start a new cart.'
+  } catch (error) {
+    errorMessage.value = toErrorMessage(error, 'The saved order could not be cancelled.')
   } finally {
     placingOrder.value = false
   }

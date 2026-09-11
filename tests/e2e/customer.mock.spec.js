@@ -128,6 +128,19 @@ test.describe('Supplemental network-mocked customer UI', () => {
     expect(backend.calls.filter(call => call.path.endsWith('/payment'))).toHaveLength(2)
   })
 
+  test('declined saved order can be cancelled before starting another cart', async ({ page, backend }) => {
+    backend.addresses = structuredClone(savedAddresses)
+    await browseToCheckout(page)
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel saved order', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeHidden()
+    expect(backend.calls.filter(call => call.path === '/orders/mock-order/cancel')).toHaveLength(1)
+  })
+
   for (const path of ['/orders/serviceability', '/orders/quote']) {
     test(`late ${path} cannot restore a quote for the previous address`, async ({ page, backend }) => {
       backend.addresses = structuredClone(savedAddresses)
