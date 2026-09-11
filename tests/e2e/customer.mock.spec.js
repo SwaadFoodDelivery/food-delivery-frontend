@@ -109,7 +109,7 @@ test.describe('Supplemental network-mocked customer UI', () => {
     await expect(page.getByRole('button', { name: 'Place demo order' })).toBeDisabled()
   })
 
-  test('declined external demo payment stays on checkout with an error', async ({ page, backend }) => {
+  test('declined payment retries the same saved order after reload', async ({ page, backend }) => {
     backend.addresses = structuredClone(savedAddresses)
     await browseToCheckout(page)
     await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
@@ -117,7 +117,61 @@ test.describe('Supplemental network-mocked customer UI', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'Demo payment declined' })).toBeVisible()
     await expect(page).toHaveURL(/\/order$/)
     expect(backend.calls.some(call => call.path.endsWith('/delivery'))).toBe(false)
-    expect(await page.evaluate(() => sessionStorage.getItem('swaad.cart_token'))).toBe('mock-cart')
+    expect(await page.evaluate(() => sessionStorage.getItem('swaad.cart_token'))).toBeNull()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('radio', { name: 'Demo payment succeeds', exact: true }).check()
+    await page.getByRole('button', { name: 'Retry demo payment', exact: true }).click()
+    await expect(page).toHaveURL(/\/orders\/mock-order\/tracking$/)
+    expect(backend.calls.filter(call => call.path === '/orders')).toHaveLength(1)
+    expect(backend.calls.filter(call => call.path.endsWith('/payment'))).toHaveLength(2)
+  })
+
+  test('declined saved order can be cancelled before starting another cart', async ({ page, backend }) => {
+    backend.addresses = structuredClone(savedAddresses)
+    await browseToCheckout(page)
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel saved order', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeHidden()
+    expect(backend.calls.filter(call => call.path === '/orders/mock-order/cancel')).toHaveLength(1)
+  })
+
+  for (const terminal of ['cancelled', 'rejected', 'delivered']) {
+    test(`saved payment reconciles an externally ${terminal} order after reload`, async ({ page, backend }) => {
+      backend.addresses = structuredClone(savedAddresses)
+      await browseToCheckout(page)
+      await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+      await page.getByRole('button', { name: 'Place demo order' }).click()
+      await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+      backend.orderStatus = terminal
+      await page.reload()
+      await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
+      await expect(page.getByText(`Your saved order is already ${terminal}. You can start a new cart.`)).toBeVisible()
+      expect(backend.calls.filter(call => call.path.endsWith('/payment'))).toHaveLength(1)
+    })
+  }
+
+  test('failed history read preserves retry state and cancellation conflict reconciles it', async ({ page, backend }) => {
+    backend.addresses = structuredClone(savedAddresses)
+    await browseToCheckout(page)
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    backend.historyError = true
+    backend.orderStatus = 'cancelled'
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Cancel saved order', exact: true })).toBeEnabled()
+    await page.getByRole('button', { name: 'Cancel saved order', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'Order already cancelled' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    backend.historyError = false
+    await page.getByRole('button', { name: 'Cancel saved order', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
   })
 
   for (const path of ['/orders/serviceability', '/orders/quote']) {

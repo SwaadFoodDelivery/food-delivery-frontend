@@ -12,6 +12,12 @@ this supplemental suite; the integrated backend run is a separate release gate.
 
 ## Install
 
+For a complete local run, use `E2E_LOCAL_SEED=1` with `E2E_BACKEND_URL`.
+It creates one fictional customer and private two-hour session per scenario in
+the guarded disposable stack. This isolates carts, addresses and per-user rate
+limits; no limiter is disabled or Redis bucket deleted. A manually supplied
+session is useful for a single scenario, but repeated runs share its allowance.
+
 Use Node 22 or newer, then:
 
 ```sh

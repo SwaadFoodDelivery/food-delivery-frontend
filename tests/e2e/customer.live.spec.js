@@ -1,5 +1,8 @@
 const { test, expect } = require('@playwright/test')
-const { readFileSync } = require('node:fs')
+const { readFileSync, mkdtempSync } = require('node:fs')
+const { execFileSync } = require('node:child_process')
+const { join } = require('node:path')
+const { tmpdir } = require('node:os')
 const { installSession, browseToCheckout, addAddress, responseFor, dataFrom } = require('./helpers')
 
 // PRIMARY ACCEPTANCE: no page.route(), response replacement, or backend stubs.
@@ -7,11 +10,20 @@ const { installSession, browseToCheckout, addAddress, responseFor, dataFrom } = 
 test.describe('Real backend customer journey (external providers mocked)', () => {
   let auth
   test.beforeEach(async ({ page, request }) => {
-    auth = process.env.E2E_AUTH_FILE ? JSON.parse(readFileSync(process.env.E2E_AUTH_FILE, 'utf8')) : {
+    let authFile = process.env.E2E_AUTH_FILE
+    if (process.env.E2E_LOCAL_SEED === '1') {
+      // Explicit local mode isolates customer/cart/rate-limit state per test.
+      // The provisioner still refuses shared DB/Redis targets. No limit bypass.
+      authFile = join(mkdtempSync(join(tmpdir(), 'swaad-browser-auth-')), 'session.json')
+      execFileSync(process.execPath, [join(__dirname, 'seed-session.cjs')], {
+        env: { ...process.env, E2E_AUTH_FILE: authFile }, stdio: 'pipe'
+      })
+    }
+    auth = authFile ? JSON.parse(readFileSync(authFile, 'utf8')) : {
       accessToken: process.env.E2E_ACCESS_TOKEN, userId: process.env.E2E_USER_ID, deviceId: process.env.E2E_DEVICE_ID
     }
     expect(Boolean(process.env.E2E_BACKEND_URL), 'Set E2E_BACKEND_URL; see tests/e2e/README.md. Live acceptance never silently skips.').toBeTruthy()
-    expect(Boolean(auth.accessToken && auth.userId), 'Provide E2E_AUTH_FILE with accessToken/userId/deviceId or E2E_ACCESS_TOKEN and E2E_USER_ID').toBeTruthy()
+    expect(Boolean(auth.accessToken && auth.userId), 'Use E2E_LOCAL_SEED=1 for the isolated local stack, E2E_AUTH_FILE or explicit session variables').toBeTruthy()
     const profile = await request.get(`${process.env.E2E_BACKEND_URL.replace(/\/$/, '')}/api/v1/users/me/profile`, {
       headers: { Authorization: `Bearer ${auth.accessToken}`, 'X-Device-ID': auth.deviceId || 'e2e-demo-device' }
     })
@@ -79,5 +91,53 @@ test.describe('Real backend customer journey (external providers mocked)', () =>
     await expect(page.getByRole('button', { name: 'Place demo order' })).toBeDisabled()
     expect(sent).not.toContain('/api/v1/orders/quote')
     expect(sent).not.toContain('/api/v1/orders')
+  })
+
+  test('declined order cancelled through history no longer traps checkout', async ({ page }) => {
+    await browseToCheckout(page)
+    await addAddress(page, `E2E cancel ${Date.now()}`)
+    await expect(page.getByRole('button', { name: 'Place demo order' })).toBeEnabled()
+    const placedResponse = responseFor(page, '/orders')
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    const placed = await dataFrom(placedResponse)
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('button', { name: 'View order history', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Your orders', exact: true })).toBeVisible()
+    const cancelled = responseFor(page, `/orders/${placed.order_id}/cancel`, 'PATCH')
+    await page.getByRole('button', { name: 'Cancel demo order', exact: true }).first().click()
+    await dataFrom(cancelled)
+    await page.getByRole('button', { name: 'Order again', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
+    await expect(page.getByText('Your saved order is already cancelled. You can start a new cart.')).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeHidden()
+  })
+
+  test('decline, reload and retry pay the same persisted order', async ({ page, request }) => {
+    await browseToCheckout(page)
+    await addAddress(page, `E2E retry ${Date.now()}`)
+    await expect(page.getByRole('button', { name: 'Place demo order' })).toBeEnabled()
+    const placements = []
+    page.on('request', r => {
+      if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/v1/orders') placements.push(r.url())
+    })
+    const placedResponse = responseFor(page, '/orders')
+    const declinedResponse = page.waitForResponse(r => /\/orders\/[^/]+\/payment$/.test(new URL(r.url()).pathname))
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    const placed = await dataFrom(placedResponse)
+    expect((await declinedResponse).status()).toBe(402)
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    const delivery = await request.get(`${process.env.E2E_BACKEND_URL}/api/v1/orders/${placed.order_id}/delivery`, { headers: { Authorization: `Bearer ${auth.accessToken}` } })
+    expect(delivery.status(), 'declined prepaid orders must not be assigned').toBe(404)
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('radio', { name: 'Demo payment succeeds', exact: true }).check()
+    const success = responseFor(page, `/orders/${placed.order_id}/payment`)
+    await page.getByRole('button', { name: 'Retry demo payment', exact: true }).click()
+    expect((await dataFrom(success)).status).toBe('success')
+    await expect(page).toHaveURL(new RegExp(`/orders/${placed.order_id}/tracking$`))
+    expect(placements).toHaveLength(1)
   })
 })

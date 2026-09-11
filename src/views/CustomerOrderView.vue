@@ -24,7 +24,19 @@
       <FormAlert :message="errorMessage" />
       <FormAlert v-if="successMessage" :message="successMessage" type="success" />
 
-      <section v-if="step === 1" aria-labelledby="restaurants-title">
+      <section v-if="pendingPayment" aria-labelledby="payment-retry-title" class="checkout-card">
+        <h2 id="payment-retry-title">Complete your demo payment</h2>
+        <p>Your order is saved. Retrying pays this same order; it does not place another one.</p>
+        <p>Order {{ pendingPayment.orderId }} · {{ money(pendingPayment.totalAmount) }}</p>
+        <v-radio-group v-model="paymentMode" :disabled="placingOrder" hide-details>
+          <v-radio label="Demo payment succeeds" value="success" />
+          <v-radio label="Simulate a declined payment" value="decline" />
+        </v-radio-group>
+        <AppButton :loading="placingOrder" :disabled="placingOrder" @click="placeDemoOrder">Retry demo payment</AppButton>
+        <AppButton variant="secondary" :disabled="placingOrder" @click="cancelPendingPayment">Cancel saved order</AppButton>
+        <AppButton variant="ghost" @click="router.push({ name: ROUTE_NAMES.ORDER_HISTORY })">View order history</AppButton>
+      </section>
+      <section v-else-if="step === 1" aria-labelledby="restaurants-title">
         <div class="discovery-hero">
           <div class="discovery-hero__copy">
             <p class="eyebrow">Shamgarh on a plate</p>
@@ -187,10 +199,16 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { listRestaurants, getRestaurantMenu } from '@/services/catalogService'
 import { addCartItem, getCart, removeCartItem } from '@/services/cartService'
 import { listAddresses, createAddress } from '@/services/addressService'
-import { checkServiceability, quoteOrder, placeOrder, payForOrder } from '@/services/orderService'
+import { checkServiceability, quoteOrder, placeOrder, payForOrder, cancelOrder, getOrderHistory } from '@/services/orderService'
 import { toErrorMessage } from '@/utils/errors'
+import { ApiError } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+import { readSessionValue, writeSessionValue, removeSessionValue } from '@/utils/storage'
 
 const router = useRouter()
+const auth = useAuthStore()
+const pendingPaymentKey = `swaad.pending_payment.${auth.userId}`
+const pendingPayment = ref(readSessionValue(pendingPaymentKey, null))
 const shamgarh = { latitude: 24.1874, longitude: 75.6396 }
 const stepLabels = ['Discover', 'Build cart', 'Checkout']
 const step = ref(1)
@@ -383,25 +401,80 @@ async function saveAddress() {
 }
 
 async function placeDemoOrder() {
-  if (placingOrder.value || cartMutating.value || quoteLoading.value || !quote.value || !cartItemCount.value) return
+  if (placingOrder.value) return
+  if (!pendingPayment.value && (cartMutating.value || quoteLoading.value || !quote.value || !cartItemCount.value)) return
   placingOrder.value = true
   clearMessages()
   try {
-    const order = await placeOrder({ cartToken: cartToken.value, addressId: selectedAddressId.value })
-    await payForOrder({ orderId: order.order_id, paymentToken: paymentMode.value === 'decline' ? 'mock_fail' : 'demo-token' })
-    sessionStorage.removeItem('swaad.cart_token')
-    router.push({ name: ROUTE_NAMES.TRACKING, params: { orderId: order.order_id } })
+    if (!pendingPayment.value) {
+      const order = await placeOrder({ cartToken: cartToken.value, addressId: selectedAddressId.value })
+      pendingPayment.value = { orderId: order.order_id, totalAmount: order.total_amount_minor }
+      writeSessionValue(pendingPaymentKey, pendingPayment.value)
+      // Placement consumed the backend cart, even when payment later declines.
+      sessionStorage.removeItem('swaad.cart_token')
+      cartToken.value = ''
+      cart.value = null
+      invalidateQuote()
+    }
+    const orderId = pendingPayment.value.orderId
+    const payment = await payForOrder({ orderId, paymentToken: paymentMode.value === 'decline' ? 'mock_fail' : 'demo-token' })
+    if (payment.status !== 'success') throw new ApiError({ status: 402, message: 'Payment has not succeeded. Please retry.' })
+    pendingPayment.value = null
+    removeSessionValue(pendingPaymentKey)
+    router.push({ name: ROUTE_NAMES.TRACKING, params: { orderId } })
   } catch (error) {
-    errorMessage.value = toErrorMessage(error, 'The demo order could not be completed.')
+    if (error.status !== 409 || !await reconcilePendingPayment()) {
+      errorMessage.value = toErrorMessage(error, 'The demo order could not be completed.')
+    }
   } finally {
     placingOrder.value = false
   }
 }
 
+async function cancelPendingPayment() {
+  if (placingOrder.value || !pendingPayment.value) return
+  placingOrder.value = true
+  clearMessages()
+  try {
+    await cancelOrder(pendingPayment.value.orderId)
+    pendingPayment.value = null
+    removeSessionValue(pendingPaymentKey)
+    step.value = 1
+    successMessage.value = 'Your saved order was cancelled. You can start a new cart.'
+  } catch (error) {
+    if (error.status !== 409 || !await reconcilePendingPayment()) {
+      errorMessage.value = toErrorMessage(error, 'The saved order could not be cancelled.')
+    }
+  } finally {
+    placingOrder.value = false
+  }
+}
+
+async function reconcilePendingPayment() {
+  const orderId = pendingPayment.value?.orderId
+  if (!orderId) return false
+  try {
+    const history = await getOrderHistory(orderId)
+    const status = history.order_status?.at(-1)?.to_status
+    if (pendingPayment.value?.orderId !== orderId || !['cancelled', 'rejected', 'delivered'].includes(status)) return false
+    pendingPayment.value = null
+    removeSessionValue(pendingPaymentKey)
+    step.value = 1
+    successMessage.value = `Your saved order is already ${status}. You can start a new cart.`
+    return true
+  } catch {
+    // A failed status read is not evidence that a saved order can be discarded.
+    return false
+  }
+}
+
 watch(cuisine, loadRestaurants)
 onMounted(async () => {
+  placingOrder.value = true
   await loadRestaurants()
   await refreshCart()
+  await reconcilePendingPayment()
+  placingOrder.value = false
 })
 </script>
 
