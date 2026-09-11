@@ -1,5 +1,8 @@
 const { test, expect } = require('@playwright/test')
-const { readFileSync } = require('node:fs')
+const { readFileSync, mkdtempSync } = require('node:fs')
+const { execFileSync } = require('node:child_process')
+const { join } = require('node:path')
+const { tmpdir } = require('node:os')
 const { installSession, browseToCheckout, addAddress, responseFor, dataFrom } = require('./helpers')
 
 // PRIMARY ACCEPTANCE: no page.route(), response replacement, or backend stubs.
@@ -7,11 +10,20 @@ const { installSession, browseToCheckout, addAddress, responseFor, dataFrom } = 
 test.describe('Real backend customer journey (external providers mocked)', () => {
   let auth
   test.beforeEach(async ({ page, request }) => {
-    auth = process.env.E2E_AUTH_FILE ? JSON.parse(readFileSync(process.env.E2E_AUTH_FILE, 'utf8')) : {
+    let authFile = process.env.E2E_AUTH_FILE
+    if (process.env.E2E_LOCAL_SEED === '1') {
+      // Explicit local mode isolates customer/cart/rate-limit state per test.
+      // The provisioner still refuses shared DB/Redis targets. No limit bypass.
+      authFile = join(mkdtempSync(join(tmpdir(), 'swaad-browser-auth-')), 'session.json')
+      execFileSync(process.execPath, [join(__dirname, 'seed-session.cjs')], {
+        env: { ...process.env, E2E_AUTH_FILE: authFile }, stdio: 'pipe'
+      })
+    }
+    auth = authFile ? JSON.parse(readFileSync(authFile, 'utf8')) : {
       accessToken: process.env.E2E_ACCESS_TOKEN, userId: process.env.E2E_USER_ID, deviceId: process.env.E2E_DEVICE_ID
     }
     expect(Boolean(process.env.E2E_BACKEND_URL), 'Set E2E_BACKEND_URL; see tests/e2e/README.md. Live acceptance never silently skips.').toBeTruthy()
-    expect(Boolean(auth.accessToken && auth.userId), 'Provide E2E_AUTH_FILE with accessToken/userId/deviceId or E2E_ACCESS_TOKEN and E2E_USER_ID').toBeTruthy()
+    expect(Boolean(auth.accessToken && auth.userId), 'Use E2E_LOCAL_SEED=1 for the isolated local stack, E2E_AUTH_FILE or explicit session variables').toBeTruthy()
     const profile = await request.get(`${process.env.E2E_BACKEND_URL.replace(/\/$/, '')}/api/v1/users/me/profile`, {
       headers: { Authorization: `Bearer ${auth.accessToken}`, 'X-Device-ID': auth.deviceId || 'e2e-demo-device' }
     })
