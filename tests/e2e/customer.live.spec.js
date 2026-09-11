@@ -92,7 +92,7 @@ test.describe('Real backend customer journey (external providers mocked)', () =>
     await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
     await page.getByRole('button', { name: 'View order history', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Your orders', exact: true })).toBeVisible()
-    const cancelled = responseFor(page, `/orders/${placed.order_id}/cancel`)
+    const cancelled = responseFor(page, `/orders/${placed.order_id}/cancel`, 'PATCH')
     await page.getByRole('button', { name: 'Cancel demo order', exact: true }).first().click()
     await dataFrom(cancelled)
     await page.getByRole('button', { name: 'Order again', exact: true }).click()
