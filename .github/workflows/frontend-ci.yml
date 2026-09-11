@@ -7,6 +7,7 @@ on:
       - codex/mock-delivery-tracking
       - codex/serviceability-policy
       - codex/onboarding-review-ui
+      - codex/browser-e2e
   push:
     branches:
       - main

@@ -24,7 +24,18 @@
       <FormAlert :message="errorMessage" />
       <FormAlert v-if="successMessage" :message="successMessage" type="success" />
 
-      <section v-if="step === 1" aria-labelledby="restaurants-title">
+      <section v-if="pendingPayment" aria-labelledby="payment-retry-title" class="checkout-card">
+        <h2 id="payment-retry-title">Complete your demo payment</h2>
+        <p>Your order is saved. Retrying pays this same order; it does not place another one.</p>
+        <p>Order {{ pendingPayment.orderId }} · {{ money(pendingPayment.totalAmount) }}</p>
+        <v-radio-group v-model="paymentMode" :disabled="placingOrder" hide-details>
+          <v-radio label="Demo payment succeeds" value="success" />
+          <v-radio label="Simulate a declined payment" value="decline" />
+        </v-radio-group>
+        <AppButton :loading="placingOrder" :disabled="placingOrder" @click="placeDemoOrder">Retry demo payment</AppButton>
+        <AppButton variant="ghost" @click="router.push({ name: ROUTE_NAMES.ORDER_HISTORY })">View order history</AppButton>
+      </section>
+      <section v-else-if="step === 1" aria-labelledby="restaurants-title">
         <div class="discovery-hero">
           <div class="discovery-hero__copy">
             <p class="eyebrow">Shamgarh on a plate</p>
@@ -189,8 +200,14 @@ import { addCartItem, getCart, removeCartItem } from '@/services/cartService'
 import { listAddresses, createAddress } from '@/services/addressService'
 import { checkServiceability, quoteOrder, placeOrder, payForOrder } from '@/services/orderService'
 import { toErrorMessage } from '@/utils/errors'
+import { ApiError } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
+import { readSessionValue, writeSessionValue, removeSessionValue } from '@/utils/storage'
 
 const router = useRouter()
+const auth = useAuthStore()
+const pendingPaymentKey = `swaad.pending_payment.${auth.userId}`
+const pendingPayment = ref(readSessionValue(pendingPaymentKey, null))
 const shamgarh = { latitude: 24.1874, longitude: 75.6396 }
 const stepLabels = ['Discover', 'Build cart', 'Checkout']
 const step = ref(1)
@@ -383,14 +400,27 @@ async function saveAddress() {
 }
 
 async function placeDemoOrder() {
-  if (placingOrder.value || cartMutating.value || quoteLoading.value || !quote.value || !cartItemCount.value) return
+  if (placingOrder.value) return
+  if (!pendingPayment.value && (cartMutating.value || quoteLoading.value || !quote.value || !cartItemCount.value)) return
   placingOrder.value = true
   clearMessages()
   try {
-    const order = await placeOrder({ cartToken: cartToken.value, addressId: selectedAddressId.value })
-    await payForOrder({ orderId: order.order_id, paymentToken: paymentMode.value === 'decline' ? 'mock_fail' : 'demo-token' })
-    sessionStorage.removeItem('swaad.cart_token')
-    router.push({ name: ROUTE_NAMES.TRACKING, params: { orderId: order.order_id } })
+    if (!pendingPayment.value) {
+      const order = await placeOrder({ cartToken: cartToken.value, addressId: selectedAddressId.value })
+      pendingPayment.value = { orderId: order.order_id, totalAmount: order.total_amount_minor }
+      writeSessionValue(pendingPaymentKey, pendingPayment.value)
+      // Placement consumed the backend cart, even when payment later declines.
+      sessionStorage.removeItem('swaad.cart_token')
+      cartToken.value = ''
+      cart.value = null
+      invalidateQuote()
+    }
+    const orderId = pendingPayment.value.orderId
+    const payment = await payForOrder({ orderId, paymentToken: paymentMode.value === 'decline' ? 'mock_fail' : 'demo-token' })
+    if (payment.status !== 'success') throw new ApiError({ status: 402, message: 'Payment has not succeeded. Please retry.' })
+    pendingPayment.value = null
+    removeSessionValue(pendingPaymentKey)
+    router.push({ name: ROUTE_NAMES.TRACKING, params: { orderId } })
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'The demo order could not be completed.')
   } finally {

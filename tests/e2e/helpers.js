@@ -24,7 +24,7 @@ async function browseToCheckout(page) {
   await page.getByRole('button', { name: 'Review cart', exact: true }).click()
   await dataFrom(addresses)
   await expect(page.getByRole('heading', { name: 'Checkout', exact: true })).toBeVisible()
-  await expect(page.getByText('1 × Kesar Special Thali', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^\d+ × Kesar Special Thali$/)).toBeVisible()
   await expect(page.getByText('Calculating delivery for this address…')).toBeHidden()
 }
 

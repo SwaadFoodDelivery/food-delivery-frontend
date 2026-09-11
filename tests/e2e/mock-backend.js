@@ -82,11 +82,11 @@ const test = base.extend({
         if (path === '/orders' && request.method() === 'POST') {
           if (!state.quantity) return await fail(400, 'CART_EMPTY', 'Cart is empty')
           state.quantity = 0 // The real backend consumes the cart at placement, even if payment fails.
-          return await reply({ order_id: 'mock-order', status: 'pending' })
+          return await reply({ order_id: 'mock-order', status: 'order_created', total_amount_minor: 25995 })
         }
         if (path === '/orders/mock-order/payment') {
           if (body.payment_token === 'mock_fail') return await fail(402, 'PAYMENT_FAILED', 'Demo payment declined')
-          return await reply({ order_id: 'mock-order', payment_status: 'paid' })
+          return await reply({ order_id: 'mock-order', status: 'success' })
         }
         if (path === '/orders/mock-order/delivery') return await reply({ order_id: 'mock-order', provider: 'mock', status: ++state.deliveryReads > 1 ? 'delivered' : 'assigned', demo_label: 'Network-mocked demo delivery — no real courier', partner_name: 'Demo courier fixture', partner_phone: 'Not a real contact', updated_at: '2026-09-11T10:00:00Z' })
         state.unexpected.push(`${request.method()} ${path}`)

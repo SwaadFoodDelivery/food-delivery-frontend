@@ -109,7 +109,7 @@ test.describe('Supplemental network-mocked customer UI', () => {
     await expect(page.getByRole('button', { name: 'Place demo order' })).toBeDisabled()
   })
 
-  test('declined external demo payment stays on checkout with an error', async ({ page, backend }) => {
+  test('declined payment retries the same saved order after reload', async ({ page, backend }) => {
     backend.addresses = structuredClone(savedAddresses)
     await browseToCheckout(page)
     await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
@@ -117,7 +117,15 @@ test.describe('Supplemental network-mocked customer UI', () => {
     await expect(page.getByRole('alert').filter({ hasText: 'Demo payment declined' })).toBeVisible()
     await expect(page).toHaveURL(/\/order$/)
     expect(backend.calls.some(call => call.path.endsWith('/delivery'))).toBe(false)
-    expect(await page.evaluate(() => sessionStorage.getItem('swaad.cart_token'))).toBe('mock-cart')
+    expect(await page.evaluate(() => sessionStorage.getItem('swaad.cart_token'))).toBeNull()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('radio', { name: 'Demo payment succeeds', exact: true }).check()
+    await page.getByRole('button', { name: 'Retry demo payment', exact: true }).click()
+    await expect(page).toHaveURL(/\/orders\/mock-order\/tracking$/)
+    expect(backend.calls.filter(call => call.path === '/orders')).toHaveLength(1)
+    expect(backend.calls.filter(call => call.path.endsWith('/payment'))).toHaveLength(2)
   })
 
   for (const path of ['/orders/serviceability', '/orders/quote']) {
