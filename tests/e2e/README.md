@@ -35,6 +35,9 @@ It creates one fictional customer and private two-hour session per scenario in
 the guarded disposable stack. This isolates carts, addresses and per-user rate
 limits; no limiter is disabled or Redis bucket deleted. A manually supplied
 session is useful for a single scenario, but repeated runs share its allowance.
+The backend's dedicated E2E launcher sets the global per-IP allowance to 300/min
+because all browser personas share loopback. Route/per-user limits are unchanged.
+Combined acceptance is not a test of the default 60/min global allowance.
 
 Use Node 22 or newer, then:
 
