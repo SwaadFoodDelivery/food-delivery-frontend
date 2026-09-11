@@ -1,0 +1,83 @@
+const { test, expect } = require('@playwright/test')
+const { readFileSync } = require('node:fs')
+const { installSession, browseToCheckout, addAddress, responseFor, dataFrom } = require('./helpers')
+
+// PRIMARY ACCEPTANCE: no page.route(), response replacement, or backend stubs.
+// External payment/delivery providers are mocked by the real demo backend.
+test.describe('Real backend customer journey (external providers mocked)', () => {
+  let auth
+  test.beforeEach(async ({ page, request }) => {
+    auth = process.env.E2E_AUTH_FILE ? JSON.parse(readFileSync(process.env.E2E_AUTH_FILE, 'utf8')) : {
+      accessToken: process.env.E2E_ACCESS_TOKEN, userId: process.env.E2E_USER_ID, deviceId: process.env.E2E_DEVICE_ID
+    }
+    expect(Boolean(process.env.E2E_BACKEND_URL), 'Set E2E_BACKEND_URL; see tests/e2e/README.md. Live acceptance never silently skips.').toBeTruthy()
+    expect(Boolean(auth.accessToken && auth.userId), 'Provide E2E_AUTH_FILE with accessToken/userId/deviceId or E2E_ACCESS_TOKEN and E2E_USER_ID').toBeTruthy()
+    const profile = await request.get(`${process.env.E2E_BACKEND_URL.replace(/\/$/, '')}/api/v1/users/me/profile`, {
+      headers: { Authorization: `Bearer ${auth.accessToken}`, 'X-Device-ID': auth.deviceId || 'e2e-demo-device' }
+    })
+    expect(profile.status(), 'Seed an active client plus an unexpired JWT and Redis session').toBe(200)
+    const { data } = await profile.json()
+    expect(data.user_id).toBe(auth.userId)
+    expect(data.role).toBe('client')
+    expect(data.account_status).toBe('active')
+    expect(data.onboarding_complete).toBe(true)
+    await installSession(page, auth)
+  })
+
+  test('browse, cart, create address, quote, place, pay, and track persisted delivery', async ({ page }, testInfo) => {
+    const trackingTimeout = Number(process.env.E2E_TRACKING_TIMEOUT_MS || 90000)
+    test.setTimeout(trackingTimeout + 60000)
+    await browseToCheckout(page)
+    const addressResponse = responseFor(page, '/users/me/addresses')
+    const serviceResponse = responseFor(page, '/orders/serviceability')
+    const quoteResponse = responseFor(page, '/orders/quote')
+    await addAddress(page, `E2E demo ${Date.now()}`)
+    const address = (await dataFrom(addressResponse)).address
+    expect(address.address_id).toBeTruthy()
+    const service = await dataFrom(serviceResponse)
+    expect(service.serviceable).toBe(true)
+    const quote = await dataFrom(quoteResponse)
+    expect(quote.total_amount_minor).toBeGreaterThan(0)
+    expect(quote.delivery_fee_minor).toBe(service.delivery_fee_minor)
+    await expect(page.getByRole('button', { name: 'Place demo order' })).toBeEnabled()
+    const placedResponse = responseFor(page, '/orders')
+    const paymentResponse = page.waitForResponse(r => /\/api\/v1\/orders\/[^/]+\/payment$/.test(new URL(r.url()).pathname) && r.request().method() === 'POST')
+    const deliveryResponse = page.waitForResponse(r => /\/api\/v1\/orders\/[^/]+\/delivery$/.test(new URL(r.url()).pathname))
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    const placed = await dataFrom(placedResponse)
+    expect(placed.order_id).toBeTruthy()
+    await dataFrom(paymentResponse)
+    const delivery = await dataFrom(deliveryResponse)
+    expect(delivery.provider).toBe('mock')
+    await expect(page).toHaveURL(new RegExp(`/orders/${placed.order_id}/tracking$`))
+    await expect(page.getByRole('heading', { name: 'Your delivery journey' })).toBeVisible()
+    await expect(page.getByRole('list', { name: 'Delivery progress' })).toBeVisible()
+    // Real elapsed time and backend polling, no clock manipulation in live mode.
+    await expect(page.getByRole('heading', { name: 'Delivered', exact: true })).toBeVisible({ timeout: trackingTimeout })
+    expect(await page.evaluate(() => sessionStorage.getItem('swaad.cart_token'))).toBeNull()
+    await testInfo.attach('real-backend-evidence.json', {
+      body: JSON.stringify({ mode: 'real-backend-external-providers-mocked', address_id: address.address_id, order_id: placed.order_id, total_amount_minor: quote.total_amount_minor, delivery_provider: delivery.provider }),
+      contentType: 'application/json'
+    })
+  })
+
+  test('outside-radius saved address blocks quote and placement', async ({ page }) => {
+    await browseToCheckout(page)
+    // Settle any automatic default-address quote before counting requests.
+    await expect(page.getByText('Calculating delivery for this address…')).toBeHidden()
+    const sent = []
+    page.on('request', request => {
+      const path = new URL(request.url()).pathname
+      if (request.method() === 'POST') sent.push(path)
+    })
+    const serviceResponse = responseFor(page, '/orders/serviceability')
+    await page.getByRole('button').filter({ hasText: process.env.E2E_OUTSIDE_ADDRESS_LABEL || 'E2E outside radius' }).click()
+    const decision = await dataFrom(serviceResponse)
+    expect(decision.serviceable).toBe(false)
+    expect(decision.reason_code).toBe('outside_delivery_radius')
+    await expect(page.getByRole('alert').filter({ hasText: 'We can’t deliver to this address' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Place demo order' })).toBeDisabled()
+    expect(sent).not.toContain('/api/v1/orders/quote')
+    expect(sent).not.toContain('/api/v1/orders')
+  })
+})

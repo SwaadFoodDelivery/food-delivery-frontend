@@ -9,6 +9,9 @@
     "test": "npm run test:unit",
     "test:unit": "vue-cli-service test:unit --runInBand",
     "test:unit:watch": "vue-cli-service test:unit --watch",
+    "test:e2e": "playwright test --project=chromium-live",
+    "test:e2e:mock": "playwright test --project=chromium-mocked",
+    "test:e2e:install": "playwright install chromium",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
@@ -21,6 +24,7 @@
     "vuetify": "^3.10.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@babel/core": "^7.12.16",
     "@babel/eslint-parser": "^7.12.16",
     "@vue/cli-plugin-babel": "~5.0.0",
