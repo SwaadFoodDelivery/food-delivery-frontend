@@ -62,7 +62,7 @@ test('owner, driver and operations complete persisted role-scoped workflows', as
     await expect(driver.getByText(`Order ${short(fixture.orders.driver)}`, { exact: true })).toBeVisible()
     await driver.getByRole('textbox', { name: 'Current city', exact: true }).fill('Shamgarh')
     const available = responseFor(driver, '/users/me/profile', 'PUT')
-    await driver.getByRole('switch').check()
+    await driver.getByRole('checkbox', { name: 'Offline', exact: true }).check()
     expect((await dataFrom(available)).profile.is_available).toBe(true)
     for (const [label, status] of [['Head to restaurant', 'en_route_to_restaurant'], ['Mark arrived', 'arrived_at_restaurant'], ['Confirm pickup', 'picked_up'], ['Start delivery', 'out_for_delivery'], ['Mark delivered', 'delivered']]) {
       const changed = responseFor(driver, '/driver/delivery/status', 'PATCH')

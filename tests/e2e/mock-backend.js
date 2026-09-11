@@ -20,7 +20,7 @@ const test = base.extend({
   backend: [async ({ page }, use) => {
     const state = {
       addresses: [], quantity: 0, calls: [], unexpected: [], pageErrors: [],
-      serviceError: false, cartError: false, deliveryReads: 0, holds: [], orderStatus: 'order_created', historyError: false,
+      serviceError: false, cartError: false, deliveryReads: 0, holds: [], orderStatus: 'order_created', historyError: false, legacyHistory: false,
       // Explicit handshakes let the test release a stale response after a newer one.
       delayNext(path, addressId) {
         const hold = { path, addressId, started: deferred(), release: deferred(), finished: deferred() }
@@ -90,7 +90,7 @@ const test = base.extend({
         }
         if (path === '/orders/mock-order/history') {
           if (state.historyError) return await fail(503, 'INTERNAL_ERROR', 'History temporarily unavailable')
-          return await reply({ order_id: 'mock-order', order_status: [{ to_status: state.orderStatus }] })
+          return await reply({ order_id: 'mock-order', status: state.orderStatus, order_status: state.legacyHistory ? [] : [{ to_status: state.orderStatus }] })
         }
         if (path === '/orders/mock-order/cancel' && request.method() === 'PATCH') {
           if (state.orderStatus === 'cancelled') return await fail(409, 'ORDER_NOT_CANCELLABLE', 'Order already cancelled')

@@ -455,7 +455,7 @@ async function reconcilePendingPayment() {
   if (!orderId) return false
   try {
     const history = await getOrderHistory(orderId)
-    const status = history.order_status?.at(-1)?.to_status
+    const status = history.status || history.order_status?.at(-1)?.to_status
     if (pendingPayment.value?.orderId !== orderId || !['cancelled', 'rejected', 'delivered'].includes(status)) return false
     pendingPayment.value = null
     removeSessionValue(pendingPaymentKey)
