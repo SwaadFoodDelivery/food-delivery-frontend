@@ -16,6 +16,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   const onboardingId = ref('')
   const status = ref('')
   const onboardingRole = ref('')
+  const rejectionReason = ref('')
   /** One entry per required document, as returned by init. */
   const documents = ref([])
   /** document_type → true while its upload is in flight. */
@@ -49,6 +50,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     onboardingId.value = ''
     status.value = ''
     onboardingRole.value = ''
+    rejectionReason.value = ''
     documents.value = []
     uploading.value = {}
   }
@@ -57,15 +59,14 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     onboardingId.value = data?.onboarding_id || ''
     status.value = data?.status || ''
     onboardingRole.value = data?.role || ''
+    rejectionReason.value = data?.rejection_reason || ''
     documents.value = Array.isArray(data?.documents) ? [...data.documents] : []
     uploading.value = {}
   }
 
   /**
-   * Starts (or restarts) onboarding for the signed-in user's role.
-   *
-   * Each call creates a fresh draft with fresh presigned URLs — those expire in
-   * minutes, so the view calls this on mount rather than reusing a stale list.
+   * Loads onboarding for the signed-in user's role, including its review state
+   * and refreshed upload URLs when the application is editable.
    *
    * @returns {Promise<object>} the init payload
    */
@@ -120,7 +121,6 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   async function submit() {
     const data = await onboardingService.submitOnboarding({ onboardingId: onboardingId.value })
     status.value = data?.status || ONBOARDING_STATUS.PENDING_VERIFICATION
-    useAuthStore().markOnboardingComplete()
     return data
   }
 
@@ -131,6 +131,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   async function resubmit() {
     const data = await onboardingService.resubmitOnboarding({ onboardingId: onboardingId.value })
     status.value = data?.status || ONBOARDING_STATUS.DRAFT
+    rejectionReason.value = ''
     return data
   }
 
@@ -138,6 +139,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     onboardingId,
     status,
     onboardingRole,
+    rejectionReason,
     documents,
     uploading,
     isInitialised,

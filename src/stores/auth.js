@@ -11,7 +11,6 @@ import { initSession } from '@/services/sessionService'
 import { getProfile } from '@/services/profileService'
 import { ACCOUNT_STATUS, ERROR_CODES } from '@/constants/auth'
 import { STORAGE_KEYS } from '@/constants/common'
-import { ROLES_PENDING_MANUAL_VERIFICATION } from '@/constants/profile'
 import {
   readSessionValue,
   readValue,
@@ -45,16 +44,6 @@ export const useAuthStore = defineStore('auth', () => {
   /** The address most recently confirmed by POST /auth/verify-email. */
   const verifiedEmail = ref('')
 
-  /**
-   * Reactive mirror of STORAGE_KEYS.ONBOARDING_SUBMITTED. A `computed` that
-   * called `readValue()` directly here would cache against a plain
-   * localStorage read, which Vue's reactivity has no visibility into — a
-   * write from `markOnboardingComplete()` would then go unnoticed until some
-   * unrelated dependency (profile/userId) happened to change too. Keeping it
-   * as a ref makes it a real, trackable dependency.
-   */
-  const onboardingSubmittedMap = ref(readValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, {}) || {})
-
   const isAuthenticated = computed(() => Boolean(accessToken.value))
   const role = computed(() => profile.value?.role || user.value?.role || '')
   const userId = computed(() => profile.value?.user_id || user.value?.user_id || '')
@@ -67,30 +56,15 @@ export const useAuthStore = defineStore('auth', () => {
    */
   const isFirstTimeUser = computed(() => user.value?.first_time_user === true)
 
-  /**
-   * True once the backend reports onboarding done, OR once this browser has
-   * seen a successful submit.
-   *
-   * The backend now flips `users.onboarding_complete` to true inside
-   * SubmitOnboarding (previously dead code — fixed after e2e testing surfaced
-   * that a submitted user could re-init onboarding forever). The local half is
-   * kept as a fallback for the window right after submit, before the next
-   * profile refetch lands — not load-bearing anymore, just avoids a UI flicker
-   * back into onboarding on a slow/failed refetch.
-   */
-  const isOnboardingComplete = computed(() => {
-    if (profile.value?.onboarding_complete === true) return true
-    if (!userId.value) return false
-    return onboardingSubmittedMap.value[userId.value] === true
-  })
+  /** Only server-confirmed approval completes onboarding; legacy submit markers do not. */
+  const isOnboardingComplete = computed(() => profile.value?.onboarding_complete === true)
 
   /**
-   * Onboarding is shown only to a signed-in, first-time user who has not
-   * finished it. Returning users are skipped, which the router also enforces by
-   * blocking navigation to /onboarding.
+   * Every signed-in user needs approval, including returning applicants.
+   * Missing/failed profile loads keep the gate closed.
    */
   const needsOnboarding = computed(
-    () => isAuthenticated.value && isFirstTimeUser.value && !isOnboardingComplete.value
+    () => isAuthenticated.value && !isOnboardingComplete.value
   )
 
   const isAccountSuspended = computed(
@@ -98,14 +72,10 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   /**
-   * Product decision, not a backend state: driver/restaurant roles show
-   * "pending verification" until reviewed, client activates immediately.
-   * See ROLES_PENDING_MANUAL_VERIFICATION for why this can't be a real
-   * account_status value today. Suspension still wins — a suspended account
-   * says so regardless of role.
+   * All roles require approval. Suspension takes precedence in account copy.
    */
   const isPendingManualVerification = computed(
-    () => !isAccountSuspended.value && ROLES_PENDING_MANUAL_VERIFICATION.includes(role.value)
+    () => needsOnboarding.value && !isAccountSuspended.value
   )
 
   /**
@@ -175,20 +145,6 @@ export const useAuthStore = defineStore('auth', () => {
     profile.value = null
     removeSessionValue(STORAGE_KEYS.ACCESS_TOKEN)
     removeSessionValue(STORAGE_KEYS.USER)
-  }
-
-  /** Records a finished onboarding for this user, per the note on isOnboardingComplete. */
-  function markOnboardingComplete() {
-    if (!userId.value) return
-    // Reassign (not mutate-in-place) so the ref itself changes and
-    // isOnboardingComplete's computed is notified.
-    onboardingSubmittedMap.value = { ...onboardingSubmittedMap.value, [userId.value]: true }
-    writeValue(STORAGE_KEYS.ONBOARDING_SUBMITTED, onboardingSubmittedMap.value)
-    if (profile.value) profile.value = { ...profile.value, onboarding_complete: true }
-    if (user.value) {
-      user.value = { ...user.value, first_time_user: false }
-      writeSessionValue(STORAGE_KEYS.USER, user.value)
-    }
   }
 
   // ─── Flows ─────────────────────────────────────────────────────────────────
@@ -292,15 +248,19 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
-   * Marks onboarding done in response to a backend 409, which is the one case
-   * where `users.onboarding_complete` is genuinely true.
+   * Refreshes approval after an already-completed response. The profile remains
+   * authoritative even when a conflict response and a review race each other.
    * @param {ApiError} error
-   * @returns {boolean} whether the error was consumed
+   * @returns {Promise<boolean>} whether approval was confirmed
    */
-  function consumeAlreadyCompleted(error) {
+  async function consumeAlreadyCompleted(error) {
     if (error?.errorCode !== ERROR_CODES.ONBOARDING_ALREADY_COMPLETED) return false
-    markOnboardingComplete()
-    return true
+    try {
+      await fetchProfile({ force: true })
+      return isOnboardingComplete.value
+    } catch {
+      return false
+    }
   }
 
   return {
@@ -333,7 +293,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchProfile,
     signOut,
     clearSession,
-    markOnboardingComplete,
     consumeAlreadyCompleted,
     registerApiHooks
   }

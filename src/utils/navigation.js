@@ -4,10 +4,8 @@ import { ROUTE_NAMES } from '@/constants/routes'
 /**
  * Resolves the landing target after a successful verify-otp.
  *
- * Onboarding wins over any `redirect` — a first-time user must finish it before
- * being dropped anywhere else. `needsOnboarding` combines the backend's
- * `first_time_user` flag with the `onboarding_complete` gate, so returning users
- * skip straight past.
+ * Onboarding wins over any `redirect` until the profile confirms approval,
+ * including when an applicant signs in again while waiting for review.
  *
  * @param {{needsOnboarding: boolean}} auth the auth store
  * @param {string} [redirect] a path captured by the auth guard

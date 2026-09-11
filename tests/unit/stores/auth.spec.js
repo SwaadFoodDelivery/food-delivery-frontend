@@ -37,7 +37,8 @@ describe('auth store', () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.sessionStorage.clear()
-    jest.clearAllMocks()
+    jest.resetAllMocks()
+    initSession.mockResolvedValue({ guest_token: 'guest-1' })
     setActivePinia(createPinia())
   })
 
@@ -69,26 +70,29 @@ describe('auth store', () => {
     expect(store.isFirstTimeUser).toBe(false)
   })
 
-  it('needsOnboarding is true only for an authenticated first-time user who has not completed it', async () => {
-    authService.verifyOtp.mockResolvedValue(verifyOtpResult({ first_time_user: true }))
+  it.each([true, false])('requires approval regardless of first_time_user=%s', async (firstTime) => {
+    authService.verifyOtp.mockResolvedValue(verifyOtpResult({ first_time_user: firstTime }))
     const store = useAuthStore()
     expect(store.needsOnboarding).toBe(false) // not authenticated yet
 
     await store.verifyOtp({ phone: '7909338983', role: ROLES.CLIENT, otp: '123456' })
     expect(store.needsOnboarding).toBe(true)
 
-    store.markOnboardingComplete()
+    getProfile.mockResolvedValue({ onboarding_complete: true })
+    await store.fetchProfile()
     expect(store.needsOnboarding).toBe(false)
   })
 
-  it('markOnboardingComplete flips isOnboardingComplete even before the next profile refetch', async () => {
-    authService.verifyOtp.mockResolvedValue(verifyOtpResult())
+  it('ignores legacy local submission markers, even after signing in again', async () => {
+    window.localStorage.setItem(STORAGE_KEYS.ONBOARDING_SUBMITTED, JSON.stringify({ 'user-1': true }))
+    authService.verifyOtp.mockResolvedValue(verifyOtpResult({ first_time_user: false }))
+    getProfile.mockResolvedValue({ onboarding_complete: false })
     const store = useAuthStore()
     await store.verifyOtp({ phone: '7909338983', role: ROLES.CLIENT, otp: '123456' })
 
     expect(store.isOnboardingComplete).toBe(false)
-    store.markOnboardingComplete()
-    expect(store.isOnboardingComplete).toBe(true)
+    await store.fetchProfile()
+    expect(store.needsOnboarding).toBe(true)
   })
 
   it('fetchProfile onboarding_complete:true wins even without the local marker', async () => {
@@ -101,18 +105,39 @@ describe('auth store', () => {
     expect(store.isOnboardingComplete).toBe(true)
   })
 
-  it('isPendingManualVerification is true for driver/restaurant roles but not client', async () => {
+  it('isPendingManualVerification is true for an unapproved driver', async () => {
     authService.verifyOtp.mockResolvedValue(verifyOtpResult({ role: ROLES.DRIVER }))
     const store = useAuthStore()
     await store.verifyOtp({ phone: '7909338983', role: ROLES.DRIVER, otp: '123456' })
     expect(store.isPendingManualVerification).toBe(true)
   })
 
-  it('isPendingManualVerification is false for client', async () => {
+  it('client also requires review until approved', async () => {
     authService.verifyOtp.mockResolvedValue(verifyOtpResult({ role: ROLES.CLIENT }))
     const store = useAuthStore()
     await store.verifyOtp({ phone: '7909338983', role: ROLES.CLIENT, otp: '123456' })
+    expect(store.isPendingManualVerification).toBe(true)
+    getProfile.mockResolvedValue({ onboarding_complete: true })
+    await store.fetchProfile()
     expect(store.isPendingManualVerification).toBe(false)
+  })
+
+  it('approved drivers no longer display pending verification', async () => {
+    authService.verifyOtp.mockResolvedValue(verifyOtpResult({ role: ROLES.DRIVER }))
+    getProfile.mockResolvedValue({ onboarding_complete: true })
+    const store = useAuthStore()
+    await store.verifyOtp({})
+    await store.fetchProfile()
+    expect(store.isPendingManualVerification).toBe(false)
+  })
+
+  it('a failed profile load keeps returning applicants gated', async () => {
+    authService.verifyOtp.mockResolvedValue(verifyOtpResult({ first_time_user: false }))
+    getProfile.mockRejectedValue(new Error('offline'))
+    const store = useAuthStore()
+    await store.verifyOtp({})
+    await expect(store.fetchProfile()).rejects.toThrow('offline')
+    expect(store.needsOnboarding).toBe(true)
   })
 
   it('a suspended account never reads as pending-manual-verification', async () => {
@@ -192,19 +217,35 @@ describe('auth store', () => {
     await expect(store.signOut()).rejects.toThrow('boom')
   })
 
-  it('consumeAlreadyCompleted only recognises its specific error code', () => {
+  it('consumeAlreadyCompleted only recognises its specific error code', async () => {
     const store = useAuthStore()
-    expect(store.consumeAlreadyCompleted(new ApiError({ errorCode: 'SOMETHING_ELSE' }))).toBe(false)
-    expect(store.consumeAlreadyCompleted(new ApiError({ errorCode: 'ONBOARDING_ALREADY_COMPLETED' }))).toBe(true)
+    await expect(store.consumeAlreadyCompleted(new ApiError({ errorCode: 'SOMETHING_ELSE' }))).resolves.toBe(false)
+    expect(getProfile).not.toHaveBeenCalled()
   })
 
-  it('consumeAlreadyCompleted marks onboarding complete for the authenticated user', async () => {
+  it('consumeAlreadyCompleted refreshes the profile to confirm approval', async () => {
     authService.verifyOtp.mockResolvedValue(verifyOtpResult())
     const store = useAuthStore()
     await store.verifyOtp({ phone: '7909338983', role: ROLES.CLIENT, otp: '123456' })
 
-    store.consumeAlreadyCompleted(new ApiError({ errorCode: 'ONBOARDING_ALREADY_COMPLETED' }))
+    getProfile.mockResolvedValueOnce({ onboarding_complete: false })
+    await store.fetchProfile()
+    getProfile.mockResolvedValueOnce({ onboarding_complete: true })
+    await expect(store.consumeAlreadyCompleted(new ApiError({ errorCode: 'ONBOARDING_ALREADY_COMPLETED' }))).resolves.toBe(true)
 
     expect(store.isOnboardingComplete).toBe(true)
+    expect(getProfile).toHaveBeenCalledTimes(2)
+    expect(window.localStorage.getItem(STORAGE_KEYS.ONBOARDING_SUBMITTED)).toBeNull()
+  })
+
+  it.each(['unapproved', 'offline'])('a conflict cannot grant approval when the profile is %s', async (state) => {
+    authService.verifyOtp.mockResolvedValue(verifyOtpResult())
+    const store = useAuthStore()
+    await store.verifyOtp({})
+    if (state === 'offline') getProfile.mockRejectedValue(new Error('offline'))
+    else getProfile.mockResolvedValue({ onboarding_complete: false })
+
+    await expect(store.consumeAlreadyCompleted(new ApiError({ errorCode: 'ONBOARDING_ALREADY_COMPLETED' }))).resolves.toBe(false)
+    expect(store.needsOnboarding).toBe(true)
   })
 })
