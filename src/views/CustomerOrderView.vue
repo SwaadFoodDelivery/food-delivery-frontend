@@ -199,7 +199,7 @@ import { ROUTE_NAMES } from '@/constants/routes'
 import { listRestaurants, getRestaurantMenu } from '@/services/catalogService'
 import { addCartItem, getCart, removeCartItem } from '@/services/cartService'
 import { listAddresses, createAddress } from '@/services/addressService'
-import { checkServiceability, quoteOrder, placeOrder, payForOrder, cancelOrder } from '@/services/orderService'
+import { checkServiceability, quoteOrder, placeOrder, payForOrder, cancelOrder, getOrderHistory } from '@/services/orderService'
 import { toErrorMessage } from '@/utils/errors'
 import { ApiError } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -423,7 +423,9 @@ async function placeDemoOrder() {
     removeSessionValue(pendingPaymentKey)
     router.push({ name: ROUTE_NAMES.TRACKING, params: { orderId } })
   } catch (error) {
-    errorMessage.value = toErrorMessage(error, 'The demo order could not be completed.')
+    if (error.status !== 409 || !await reconcilePendingPayment()) {
+      errorMessage.value = toErrorMessage(error, 'The demo order could not be completed.')
+    }
   } finally {
     placingOrder.value = false
   }
@@ -440,14 +442,37 @@ async function cancelPendingPayment() {
     step.value = 1
     successMessage.value = 'Your saved order was cancelled. You can start a new cart.'
   } catch (error) {
-    errorMessage.value = toErrorMessage(error, 'The saved order could not be cancelled.')
+    if (error.status !== 409 || !await reconcilePendingPayment()) {
+      errorMessage.value = toErrorMessage(error, 'The saved order could not be cancelled.')
+    }
   } finally {
     placingOrder.value = false
   }
 }
 
+async function reconcilePendingPayment() {
+  const orderId = pendingPayment.value?.orderId
+  if (!orderId) return false
+  try {
+    const history = await getOrderHistory(orderId)
+    const status = history.order_status?.at(-1)?.to_status
+    if (pendingPayment.value?.orderId !== orderId || !['cancelled', 'rejected', 'delivered'].includes(status)) return false
+    pendingPayment.value = null
+    removeSessionValue(pendingPaymentKey)
+    step.value = 1
+    successMessage.value = `Your saved order is already ${status}. You can start a new cart.`
+    return true
+  } catch {
+    // A failed status read is not evidence that a saved order can be discarded.
+    return false
+  }
+}
+
 watch(cuisine, loadRestaurants)
 onMounted(async () => {
+  placingOrder.value = true
+  await reconcilePendingPayment()
+  placingOrder.value = false
   await loadRestaurants()
   await refreshCart()
 })

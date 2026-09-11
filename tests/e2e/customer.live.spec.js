@@ -81,6 +81,27 @@ test.describe('Real backend customer journey (external providers mocked)', () =>
     expect(sent).not.toContain('/api/v1/orders')
   })
 
+  test('declined order cancelled through history no longer traps checkout', async ({ page }) => {
+    await browseToCheckout(page)
+    await addAddress(page, `E2E cancel ${Date.now()}`)
+    await expect(page.getByRole('button', { name: 'Place demo order' })).toBeEnabled()
+    const placedResponse = responseFor(page, '/orders')
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    const placed = await dataFrom(placedResponse)
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    await page.getByRole('button', { name: 'View order history', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Your orders', exact: true })).toBeVisible()
+    const cancelled = responseFor(page, `/orders/${placed.order_id}/cancel`)
+    await page.getByRole('button', { name: 'Cancel demo order', exact: true }).first().click()
+    await dataFrom(cancelled)
+    await page.getByRole('button', { name: 'Order again', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
+    await expect(page.getByText('Your saved order is already cancelled. You can start a new cart.')).toBeVisible()
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeHidden()
+  })
+
   test('decline, reload and retry pay the same persisted order', async ({ page, request }) => {
     await browseToCheckout(page)
     await addAddress(page, `E2E retry ${Date.now()}`)

@@ -20,7 +20,7 @@ const test = base.extend({
   backend: [async ({ page }, use) => {
     const state = {
       addresses: [], quantity: 0, calls: [], unexpected: [], pageErrors: [],
-      serviceError: false, cartError: false, deliveryReads: 0, holds: [],
+      serviceError: false, cartError: false, deliveryReads: 0, holds: [], orderStatus: 'order_created', historyError: false,
       // Explicit handshakes let the test release a stale response after a newer one.
       delayNext(path, addressId) {
         const hold = { path, addressId, started: deferred(), release: deferred(), finished: deferred() }
@@ -88,7 +88,15 @@ const test = base.extend({
           if (body.payment_token === 'mock_fail') return await fail(402, 'PAYMENT_FAILED', 'Demo payment declined')
           return await reply({ order_id: 'mock-order', status: 'success' })
         }
-        if (path === '/orders/mock-order/cancel' && request.method() === 'PATCH') return await reply({ order_id: 'mock-order', status: 'cancelled' })
+        if (path === '/orders/mock-order/history') {
+          if (state.historyError) return await fail(503, 'INTERNAL_ERROR', 'History temporarily unavailable')
+          return await reply({ order_id: 'mock-order', order_status: [{ to_status: state.orderStatus }] })
+        }
+        if (path === '/orders/mock-order/cancel' && request.method() === 'PATCH') {
+          if (state.orderStatus === 'cancelled') return await fail(409, 'ORDER_NOT_CANCELLABLE', 'Order already cancelled')
+          state.orderStatus = 'cancelled'
+          return await reply({ order_id: 'mock-order', status: 'cancelled' })
+        }
         if (path === '/orders/mock-order/delivery') return await reply({ order_id: 'mock-order', provider: 'mock', status: ++state.deliveryReads > 1 ? 'delivered' : 'assigned', demo_label: 'Network-mocked demo delivery — no real courier', partner_name: 'Demo courier fixture', partner_phone: 'Not a real contact', updated_at: '2026-09-11T10:00:00Z' })
         state.unexpected.push(`${request.method()} ${path}`)
         return await fail(501, 'UNEXPECTED_MOCK_REQUEST', 'Missing deterministic fixture')
