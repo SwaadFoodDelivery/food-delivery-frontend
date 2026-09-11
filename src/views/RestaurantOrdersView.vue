@@ -99,7 +99,7 @@ function formatDate(value) {
 }
 
 function paymentLabel(value) {
-  return value === 'cod' ? 'Cash on delivery' : 'Demo payment'
+  return ['cash_on_delivery', 'cod'].includes(value) ? 'Cash on delivery' : 'Demo payment'
 }
 
 function statusLabel(value) {

@@ -47,6 +47,7 @@ test('owner, driver and operations complete persisted role-scoped workflows', as
     await owner.goto('/restaurant/orders')
     await expect(owner.getByRole('heading', { name: `E2E Persona Kitchen ${fixture.restaurantId.slice(0, 8)}` })).toBeVisible()
     const card = owner.locator('.owner-order-card').filter({ hasText: `Order ${short(fixture.orders.owner)}` })
+    await expect(card.getByText('Cash on delivery', { exact: true })).toBeVisible()
     for (const [label, status] of [['Accept order', 'accepted'], ['Start preparing', 'preparing'], ['Mark ready', 'ready_for_pickup']]) {
       const changed = responseFor(owner, `/restaurants/${fixture.restaurantId}/orders/${fixture.orders.owner}/status`, 'PATCH')
       await card.getByRole('button', { name: label, exact: true }).click()
@@ -77,7 +78,11 @@ test('owner, driver and operations complete persisted role-scoped workflows', as
     expect((await history.json()).data.order_status.at(-1).to_status).toBe('delivered')
 
     const manager = await pageFor('manager')
+    const overviewResponse = responseFor(manager, '/operations/overview', 'GET')
+    const auditResponse = responseFor(manager, '/operations/audit', 'GET')
     await manager.goto('/operations')
+    await dataFrom(overviewResponse)
+    await dataFrom(auditResponse)
     await expect(manager.getByRole('heading', { name: 'Keep the demo moving', exact: true })).toBeVisible()
     const opsRow = manager.locator('.order-row').filter({ hasText: short(fixture.orders.operations) })
     const cancelled = responseFor(manager, `/operations/orders/${fixture.orders.operations}/cancel`, 'PATCH')
