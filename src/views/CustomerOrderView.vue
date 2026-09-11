@@ -471,10 +471,10 @@ async function reconcilePendingPayment() {
 watch(cuisine, loadRestaurants)
 onMounted(async () => {
   placingOrder.value = true
-  await reconcilePendingPayment()
-  placingOrder.value = false
   await loadRestaurants()
   await refreshCart()
+  await reconcilePendingPayment()
+  placingOrder.value = false
 })
 </script>
 
