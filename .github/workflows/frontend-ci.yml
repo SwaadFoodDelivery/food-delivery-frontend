@@ -8,6 +8,7 @@ on:
       - codex/serviceability-policy
       - codex/onboarding-review-ui
       - codex/browser-e2e
+      - codex/payment-retry-ui
   push:
     branches:
       - main
