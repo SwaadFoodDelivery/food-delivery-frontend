@@ -174,6 +174,19 @@ test.describe('Supplemental network-mocked customer UI', () => {
     await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
   })
 
+  test('legacy cancelled order clears retry state even with an empty timeline', async ({ page, backend }) => {
+    backend.addresses = structuredClone(savedAddresses)
+    await browseToCheckout(page)
+    await page.getByRole('radio', { name: 'Simulate a declined payment' }).check()
+    await page.getByRole('button', { name: 'Place demo order' }).click()
+    await expect(page.getByRole('heading', { name: 'Complete your demo payment' })).toBeVisible()
+    backend.orderStatus = 'cancelled'
+    backend.legacyHistory = true
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Fictional kitchens of Shamgarh' })).toBeVisible()
+    await expect(page.getByText('Your saved order is already cancelled. You can start a new cart.')).toBeVisible()
+  })
+
   for (const path of ['/orders/serviceability', '/orders/quote']) {
     test(`late ${path} cannot restore a quote for the previous address`, async ({ page, backend }) => {
       backend.addresses = structuredClone(savedAddresses)

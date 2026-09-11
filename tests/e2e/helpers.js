@@ -1,12 +1,12 @@
 const { expect } = require('@playwright/test')
 
-async function installSession(page, { accessToken, userId, deviceId = 'e2e-demo-device' }) {
+async function installSession(page, { accessToken, userId, role = 'client', deviceId = 'e2e-demo-device' }) {
   // Auth bootstrap only: all order interactions still go through the UI.
-  await page.addInitScript(({ accessToken, userId, deviceId }) => {
+  await page.addInitScript(({ accessToken, userId, role, deviceId }) => {
     sessionStorage.setItem('fd.access_token', JSON.stringify(accessToken))
-    sessionStorage.setItem('fd.user', JSON.stringify({ user_id: userId, role: 'client', first_time_user: false }))
+    sessionStorage.setItem('fd.user', JSON.stringify({ user_id: userId, role, first_time_user: false }))
     localStorage.setItem('fd.device_id', JSON.stringify(deviceId))
-  }, { accessToken, userId, deviceId })
+  }, { accessToken, userId, role, deviceId })
 }
 
 async function browseToCheckout(page) {

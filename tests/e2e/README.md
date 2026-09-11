@@ -10,6 +10,24 @@ session; login, onboarding and human approvals are not covered or fabricated.
 coverage. It cannot satisfy real-backend acceptance. The frontend CI job runs
 this supplemental suite; the integrated backend run is a separate release gate.
 
+## Owner, driver and operations browser acceptance
+
+Run `E2E_LOCAL_SEED=1 E2E_BACKEND_URL=http://127.0.0.1:18080 npm run test:e2e:personas`.
+This separate real-backend project provisions NEW fictional accounts, an isolated
+restaurant, three COD orders, driver assignments and one complete pending
+application in the guarded disposable database. It never resets existing data.
+Preseeded document metadata is explicitly a review precondition, not evidence of
+browser upload or real identity verification. Assignment timers initially wait a
+day so the test controls manual actions; use the 30-second local backend duration.
+
+The browser exercises owner accept/prepare/ready, driver availability and all five
+delivery actions, manager cancellation and approval/audit, and the same applicant
+session's pending-to-approved access. Read-only API assertions check unauthorized
+client/pending-driver denial and persisted results. Four screenshots and a
+token-free JSON attachment are captured. No HTTP responses are intercepted;
+private 0600 sessions expire in two hours. Keep traces off. This is local role
+acceptance, not independent human/GitHub approval or login/upload coverage.
+
 ## Install
 
 For a complete local run, use `E2E_LOCAL_SEED=1` with `E2E_BACKEND_URL`.
@@ -17,6 +35,9 @@ It creates one fictional customer and private two-hour session per scenario in
 the guarded disposable stack. This isolates carts, addresses and per-user rate
 limits; no limiter is disabled or Redis bucket deleted. A manually supplied
 session is useful for a single scenario, but repeated runs share its allowance.
+The backend's dedicated E2E launcher sets the global per-IP allowance to 300/min
+because all browser personas share loopback. Route/per-user limits are unchanged.
+Combined acceptance is not a test of the default 60/min global allowance.
 
 Use Node 22 or newer, then:
 
