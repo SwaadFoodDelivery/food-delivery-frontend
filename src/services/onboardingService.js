@@ -2,7 +2,7 @@
  * Onboarding endpoints.
  * internal/services/users/api/{routes,handler}/onboarding.go
  *
- * Every call except the upload callback is Bearer-authenticated and passes
+ * Every call is Bearer-authenticated and passes
  * through RequireOnboardingAccess, which rejects with 403 ACCOUNT_NOT_ACTIVE or
  * 409 ONBOARDING_ALREADY_COMPLETED before the handler runs.
  */
@@ -14,15 +14,16 @@ import { DEFAULT_COUNTRY } from '@/constants/onboarding'
 /**
  * POST /onboarding/role/init — body: { role, country }.
  *
- * Creates a draft and returns one entry per required document for the role,
- * each with its own presigned S3 PUT URL. The document set comes from the
- * `document_type_definitions` table — the frontend must not assume it.
+ * Resumes the latest application or creates a draft. Drafts return the existing
+ * documents with fresh presigned URLs; pending/rejected applications return no
+ * documents, and rejected applications include rejection_reason. The document
+ * set comes from the backend — the frontend must not assume it.
  *
  * `role` must equal the role in the access token or the handler returns
  * 403 ROLE_MISMATCH, so always pass the authenticated role.
  *
  * @param {{role: string, country?: string}} params
- * @returns {Promise<{onboarding_id: string, status: string, role: string, documents: Array<{
+ * @returns {Promise<{onboarding_id: string, status: string, role: string, rejection_reason?: string, documents: Array<{
  *   document_id: string, document_type: string, s3_key: string,
  *   upload_url: string, method: string, expires_at: string, upload_status: string
  * }>}>}
@@ -39,7 +40,8 @@ export async function initOnboarding({ role, country = DEFAULT_COUNTRY }) {
  * POST /onboarding/documents/uploaded — body: { s3_key }.
  *
  * Flips a document to `uploaded` after a successful PUT to its presigned URL.
- * Public on this backend — it takes no credential at all.
+ * The backend checks ownership and verifies the stored object with HEAD before
+ * accepting the confirmation. The access token goes only to this API call.
  *
  * @param {{s3Key: string}} params the exact s3_key returned by init
  * @returns {Promise<{updated: boolean}>}
@@ -47,7 +49,7 @@ export async function initOnboarding({ role, country = DEFAULT_COUNTRY }) {
 export async function markDocumentUploaded({ s3Key }) {
   return request(API_URLS.ONBOARDING_DOCUMENT_UPLOADED, {
     method: HTTP_METHODS.POST,
-    authMode: AUTH_MODE.NONE,
+    authMode: AUTH_MODE.BEARER,
     body: { s3_key: s3Key }
   })
 }

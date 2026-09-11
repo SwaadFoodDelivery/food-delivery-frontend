@@ -89,7 +89,7 @@ export const DOCUMENT_META = {
 export const ONBOARDING_INTRO = {
   [ROLES.CLIENT]: {
     title: 'Verify your identity',
-    subtitle: 'One document and you are ready to order.'
+    subtitle: 'Upload your identity document for review before you can order.'
   },
   [ROLES.DRIVER]: {
     title: 'Get road-ready',
@@ -110,6 +110,9 @@ export const ONBOARDING_MESSAGES = {
   FILE_TOO_LARGE: `Each file must be under ${MAX_FILE_SIZE_LABEL}.`,
   UPLOADS_INCOMPLETE: 'Upload every document before submitting.',
   SUBMIT_SUCCESS: 'Documents submitted. We will review them shortly.',
+  PENDING_REVIEW: 'Your application is pending review. Access will be available after approval.',
+  APPROVED: 'Your application is approved. You can now continue.',
+  REJECTED: 'Your application needs changes. Start over to update your documents and submit them for review again.',
   ALREADY_COMPLETED: 'Onboarding is already complete for this account.',
   UPLOAD_FAILED: 'Upload failed. Check the file and try again.'
 }

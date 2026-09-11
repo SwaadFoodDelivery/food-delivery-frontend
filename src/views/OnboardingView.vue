@@ -19,10 +19,24 @@
         <AppButton variant="secondary" :loading="isLoading" @click="start">Try again</AppButton>
       </div>
 
-      <!-- Submitted -->
-      <div v-else-if="onboarding.isSubmitted" class="onboarding__state">
-        <FormAlert :message="submittedMessage" type="success" />
+      <!-- Approval is confirmed by the profile, not the submit response. -->
+      <div v-else-if="auth.isOnboardingComplete" class="onboarding__state">
+        <FormAlert :message="ONBOARDING_MESSAGES.APPROVED" type="success" />
         <AppButton block @click="goToLanding">Continue</AppButton>
+      </div>
+
+      <div v-else-if="onboarding.isSubmitted" class="onboarding__state" role="status" aria-live="polite">
+        <h2>Pending review</h2>
+        <FormAlert :message="submittedMessage" type="info" />
+        <p>{{ ONBOARDING_MESSAGES.PENDING_REVIEW }}</p>
+        <AppButton block :loading="isLoading" @click="start">Check review status</AppButton>
+      </div>
+
+      <div v-else-if="onboarding.isRejected" class="onboarding__state">
+        <FormAlert :message="ONBOARDING_MESSAGES.REJECTED" type="warning" />
+        <p v-if="onboarding.rejectionReason">{{ onboarding.rejectionReason }}</p>
+        <FormAlert :message="feedback.message" :type="feedback.type" />
+        <AppButton block :loading="isSubmitting" @click="onResubmit">Start over</AppButton>
       </div>
 
       <!-- No documents configured for this role -->
@@ -31,7 +45,7 @@
           :message="`No documents are configured for the ${roleLabel} role yet.`"
           type="info"
         />
-        <AppButton variant="secondary" @click="goToLanding">Skip for now</AppButton>
+        <AppButton variant="secondary" :loading="isLoading" @click="start">Try again</AppButton>
       </div>
 
       <!-- Document upload -->
@@ -83,16 +97,9 @@
           Submit for verification
         </AppButton>
 
-        <AppButton
-          v-if="onboarding.isRejected"
-          variant="secondary"
-          block
-          :loading="isSubmitting"
-          @click="onResubmit"
-        >
-          Start over
-        </AppButton>
       </template>
+      <FormAlert :message="signOutError" type="error" />
+      <AppButton variant="ghost" :loading="isSigningOut" :disabled="isSubmitting || hasUploadsInFlight" @click="onSignOut">Sign out</AppButton>
     </section>
   </main>
 </template>
@@ -109,7 +116,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { updateClientProfile } from '@/services/profileService'
 import { ERROR_CODES, ROLES, ROLE_LABELS } from '@/constants/auth'
-import { ONBOARDING_INTRO, ONBOARDING_MESSAGES } from '@/constants/onboarding'
+import { ONBOARDING_INTRO, ONBOARDING_MESSAGES, ONBOARDING_STATUS } from '@/constants/onboarding'
 import { ROUTE_NAMES } from '@/constants/routes'
 import { hasErrorCode, toErrorMessage } from '@/utils/errors'
 
@@ -120,6 +127,8 @@ const onboarding = useOnboardingStore()
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const loadError = ref('')
+const isSigningOut = ref(false)
+const signOutError = ref('')
 const submittedMessage = ref(ONBOARDING_MESSAGES.SUBMIT_SUCCESS)
 const feedback = reactive({ message: '', type: 'info' })
 
@@ -130,8 +139,11 @@ const isClientRole = computed(() => auth.role === ROLES.CLIENT)
 const detailsSaved = ref(false)
 const isSavingDetails = ref(false)
 
-const canSubmit = computed(
-  () => onboarding.allDocumentsUploaded && (!isClientRole.value || detailsSaved.value)
+const hasUploadsInFlight = computed(() => Object.values(onboarding.uploading).some(Boolean))
+const canSubmit = computed(() =>
+  onboarding.status === ONBOARDING_STATUS.DRAFT && !isSubmitting.value &&
+  !isSavingDetails.value && !hasUploadsInFlight.value &&
+  onboarding.allDocumentsUploaded && (!isClientRole.value || detailsSaved.value)
 )
 
 const roleLabel = computed(() => ROLE_LABELS[auth.role] || auth.role)
@@ -148,19 +160,19 @@ function goToLanding() {
   router.replace({ name: ROUTE_NAMES.LANDING })
 }
 
-/**
- * Each init creates a fresh draft with fresh presigned URLs. Those expire within
- * minutes, so the view starts one on mount rather than reusing a stale list.
- */
+/** Refreshes approval and the application's review state or upload URLs. */
 async function start() {
   isLoading.value = true
   loadError.value = ''
   try {
+    await auth.fetchProfile({ force: true })
+    if (auth.isOnboardingComplete) return
+    if (auth.profile?.profile?.date_of_birth && auth.profile?.profile?.gender) {
+      detailsSaved.value = true
+    }
     await onboarding.start()
   } catch (error) {
-    // The one case where users.onboarding_complete is genuinely true — record it
-    // and get out of the user's way.
-    if (auth.consumeAlreadyCompleted(error)) {
+    if (await auth.consumeAlreadyCompleted(error)) {
       goToLanding()
       return
     }
@@ -200,7 +212,7 @@ async function onUpload({ documentType, file }) {
 }
 
 async function onSubmit() {
-  if (isSubmitting.value) return
+  if (!canSubmit.value) return
   isSubmitting.value = true
   setFeedback('')
   try {
@@ -211,7 +223,7 @@ async function onSubmit() {
       setFeedback(ONBOARDING_MESSAGES.UPLOADS_INCOMPLETE, 'warning')
       return
     }
-    if (auth.consumeAlreadyCompleted(error)) {
+    if (await auth.consumeAlreadyCompleted(error)) {
       goToLanding()
       return
     }
@@ -223,6 +235,7 @@ async function onSubmit() {
 
 /** Returns a rejected onboarding to draft, then pulls a fresh document set. */
 async function onResubmit() {
+  if (isSubmitting.value || !onboarding.isRejected) return
   isSubmitting.value = true
   setFeedback('')
   try {
@@ -235,20 +248,23 @@ async function onResubmit() {
   }
 }
 
+async function onSignOut() {
+  if (isSigningOut.value) return
+  isSigningOut.value = true
+  signOutError.value = ''
+  try {
+    await auth.signOut()
+    onboarding.reset()
+    await router.replace({ name: ROUTE_NAMES.LOGIN })
+  } catch (error) {
+    signOutError.value = toErrorMessage(error)
+  } finally {
+    isSigningOut.value = false
+  }
+}
+
 onMounted(async () => {
   onboarding.reset()
-  // The router guard already loaded the profile; this only covers a hard reload
-  // straight onto /onboarding.
-  try {
-    await auth.fetchProfile()
-  } catch {
-    // Non-fatal — start() will surface anything that actually blocks onboarding.
-  }
-  // Already saved in an earlier, interrupted onboarding attempt — don't force
-  // filling the form out again.
-  if (auth.profile?.profile?.date_of_birth && auth.profile?.profile?.gender) {
-    detailsSaved.value = true
-  }
   await start()
 })
 </script>

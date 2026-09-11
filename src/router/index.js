@@ -114,17 +114,22 @@ router.beforeEach(async (to) => {
   try {
     await auth.fetchProfile()
   } catch {
-    // Falls back to the first_time_user flag carried on the session.
+    // Without confirmed approval, needsOnboarding keeps access gated.
+  }
+
+  // A profile request can expire the session through the API interceptor.
+  if (!auth.isAuthenticated) {
+    return { name: ROUTE_NAMES.LOGIN, query: { redirect: to.fullPath } }
   }
 
   if (to.meta.guestOnly) return resolvePostAuthRoute(auth)
 
-  // First-time users cannot leave onboarding…
+  // Applicants stay in onboarding until approval, across subsequent sign-ins.
   if (auth.needsOnboarding && to.name !== ROUTE_NAMES.ONBOARDING) {
     return { name: ROUTE_NAMES.ONBOARDING }
   }
 
-  // …and returning users cannot enter it.
+  // Approved users no longer need onboarding.
   if (!auth.needsOnboarding && to.name === ROUTE_NAMES.ONBOARDING) {
     return { name: ROUTE_NAMES.LANDING }
   }
