@@ -19,6 +19,7 @@ async function browseToCheckout(page) {
   await expect(page.getByRole('heading', { name: 'Kesar Thali Ghar' })).toBeVisible()
   await page.getByRole('article').filter({ hasText: 'Kesar Special Thali' })
     .getByRole('button', { name: 'Add', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Review cart', exact: true })).toBeVisible()
   const addresses = responseFor(page, '/users/me/addresses', 'GET')
   await page.getByRole('button', { name: 'Review cart', exact: true }).click()
   await dataFrom(addresses)

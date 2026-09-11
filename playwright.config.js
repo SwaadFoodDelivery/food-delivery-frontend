@@ -18,6 +18,7 @@ module.exports = defineConfig({
     ...devices['Desktop Chrome'],
     baseURL,
     serviceWorkers: 'block',
+    actionTimeout: 15000,
     screenshot: 'only-on-failure'
   },
   projects: [
