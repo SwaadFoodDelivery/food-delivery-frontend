@@ -103,7 +103,7 @@
                   <p>{{ item.description }}</p>
                   <div class="menu-item__meta"><strong>{{ money(item.price_minor) }}</strong><span v-for="tag in item.tags" :key="tag">{{ tag }}</span></div>
                 </div>
-                <AppButton variant="secondary" :disabled="!item.is_available" @click="addItem(item)">{{ item.is_available ? 'Add' : 'Unavailable' }}</AppButton>
+                <AppButton variant="secondary" :disabled="!item.is_available || cartMutating || placingOrder" @click="addItem(item)">{{ item.is_available ? 'Add' : 'Unavailable' }}</AppButton>
               </article>
             </v-card-text>
           </v-card>
@@ -161,14 +161,14 @@
             <v-card-text>
               <div v-for="item in cart?.items || []" :key="item.cart_item_id" class="summary-line">
                 <span>{{ item.quantity }} × {{ item.name }}</span><strong>{{ money(item.line_total_minor) }}</strong>
-                <button type="button" class="remove-link" @click="removeItem(item.cart_item_id)">Remove</button>
+                <button type="button" class="remove-link" :disabled="cartMutating || placingOrder" @click="removeItem(item.cart_item_id)">Remove</button>
               </div>
               <div v-if="serviceability && !serviceability.serviceable" class="serviceability-warning" role="alert"><strong>We can’t deliver to this address</strong><p>{{ serviceability.reason }}</p></div>
               <p v-else-if="serviceability" class="serviceability-note">{{ serviceability.reason }} · {{ serviceability.estimated_delivery_min }} min · {{ money(serviceability.delivery_fee_minor) }} delivery</p>
               <div v-if="quote" class="summary-total"><span>Subtotal</span><strong>{{ money(quote.subtotal_minor) }}</strong><span>Taxes</span><strong>{{ money(quote.taxes_minor) }}</strong><span>Delivery</span><strong>{{ money(quote.delivery_fee_minor) }}</strong><span class="summary-total__grand">Total</span><strong class="summary-total__grand">{{ money(quote.total_amount_minor) }}</strong></div>
               <p v-else-if="quoteLoading" class="muted-copy">Calculating delivery for this address…</p>
               <p v-else-if="!serviceability" class="muted-copy">Choose an address to calculate your total.</p>
-              <AppButton block :loading="placingOrder" :disabled="quoteLoading || !selectedAddressId || !quote || !cartItemCount" @click="placeDemoOrder">Place demo order</AppButton>
+              <AppButton block :loading="placingOrder" :disabled="cartMutating || placingOrder || quoteLoading || !selectedAddressId || !quote || !cartItemCount" @click="placeDemoOrder">Place demo order</AppButton>
             </v-card-text>
           </v-card>
         </div>
@@ -197,6 +197,7 @@ const step = ref(1)
 const loading = ref(false)
 const savingAddress = ref(false)
 const placingOrder = ref(false)
+const cartMutating = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const cuisine = ref('')
@@ -225,6 +226,13 @@ function money(minor = 0) {
 function clearMessages() {
   errorMessage.value = ''
   successMessage.value = ''
+}
+
+function invalidateQuote() {
+  ++quoteRequestSequence
+  quote.value = null
+  serviceability.value = null
+  quoteLoading.value = false
 }
 
 async function loadRestaurants() {
@@ -259,11 +267,16 @@ async function refreshCart() {
   try {
     cart.value = await getCart(cartToken.value)
   } catch (error) {
+    cart.value = null
+    invalidateQuote()
     errorMessage.value = toErrorMessage(error, 'Your cart could not be refreshed.')
   }
 }
 
 async function addItem(item) {
+  if (cartMutating.value || placingOrder.value) return
+  cartMutating.value = true
+  invalidateQuote()
   clearMessages()
   try {
     const result = await addCartItem({ cartToken: cartToken.value, restaurantId: selectedRestaurant.value.restaurant_id, itemId: item.item_id })
@@ -273,22 +286,27 @@ async function addItem(item) {
     successMessage.value = `${item.name} added to your cart.`
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'That item could not be added.')
+  } finally {
+    cartMutating.value = false
   }
 }
 
 async function removeItem(cartItemId) {
+  if (cartMutating.value || placingOrder.value) return
+  cartMutating.value = true
+  invalidateQuote()
   clearMessages()
   try {
     await removeCartItem(cartToken.value, cartItemId)
     await refreshCart()
-    if (!cartItemCount.value) {
-      quote.value = null
-      serviceability.value = null
-    } else if (selectedAddressId.value) {
+    cartMutating.value = false
+    if (cartItemCount.value && selectedAddressId.value) {
       await loadQuote()
     }
   } catch (error) {
     errorMessage.value = toErrorMessage(error, 'That item could not be removed.')
+  } finally {
+    cartMutating.value = false
   }
 }
 
@@ -314,7 +332,7 @@ async function loadQuote() {
   quote.value = null
   serviceability.value = null
   errorMessage.value = ''
-  if (!addressId || !currentCartToken || !restaurantId) {
+  if (cartMutating.value || !cartItemCount.value || !addressId || !currentCartToken || !restaurantId) {
     quoteLoading.value = false
     return
   }
@@ -365,6 +383,7 @@ async function saveAddress() {
 }
 
 async function placeDemoOrder() {
+  if (placingOrder.value || cartMutating.value || quoteLoading.value || !quote.value || !cartItemCount.value) return
   placingOrder.value = true
   clearMessages()
   try {
