@@ -12,6 +12,7 @@
     "test:e2e": "playwright test --project=chromium-live",
     "test:e2e:mock": "playwright test --project=chromium-mocked",
     "test:e2e:personas": "playwright test --project=chromium-personas",
+    "test:e2e:auth": "playwright test --project=chromium-auth",
     "test:e2e:install": "playwright install chromium",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },

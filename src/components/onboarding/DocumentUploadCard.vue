@@ -7,7 +7,7 @@
 
     <p v-if="meta.hint" class="doc-card__hint">{{ meta.hint }}</p>
 
-    <template v-if="!isUploaded">
+    <template v-if="!isUploaded || replacing">
       <v-file-input
         :model-value="file"
         :label="`Choose ${meta.label.toLowerCase()}`"
@@ -35,11 +35,12 @@
     <p v-else class="doc-card__filename">
       {{ document.file_name || 'Document received' }}
     </p>
+    <AppButton v-if="isUploaded && !replacing" variant="ghost" :disabled="disabled || isUploading" @click="replacing = true">Replace document</AppButton>
   </li>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import AppButton from '@/components/common/AppButton.vue'
 import { ACCEPTED_FILE_TYPES, ONBOARDING_MESSAGES, UPLOAD_STATUS } from '@/constants/onboarding'
@@ -55,6 +56,10 @@ const emit = defineEmits(['upload'])
 
 const file = ref(null)
 const error = ref('')
+const replacing = ref(false)
+// The store replaces the document object only after both PUT and confirmation
+// succeed. Failed replacements keep the editor visible for a retry.
+watch(() => props.document, () => { replacing.value = false; file.value = null })
 
 const meta = computed(() => documentMeta(props.document.document_type))
 const isUploaded = computed(() => props.document.upload_status === UPLOAD_STATUS.UPLOADED)
