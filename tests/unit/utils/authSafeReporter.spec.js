@@ -1,6 +1,7 @@
-const AuthSafeReporter = require('../../../e2e/auth-safe-reporter.cjs')
-const config = require('../../../../playwright.auth.config')
-const baseConfig = require('../../../../playwright.config')
+/** @jest-environment node */
+const AuthSafeReporter = require('../../e2e/auth-safe-reporter.cjs')
+const config = require('../../../playwright.auth.config')
+const baseConfig = require('../../../playwright.config')
 
 describe('auth reporting credential boundary', () => {
   it('never emits synthetic credentials from titles, steps, errors, attachments or logs', () => {
