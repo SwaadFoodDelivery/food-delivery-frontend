@@ -1,7 +1,8 @@
 /** @jest-environment node */
 const AuthSafeReporter = require('../../e2e/auth-safe-reporter.cjs')
-const config = require('../../../playwright.auth.config')
-const baseConfig = require('../../../playwright.config')
+const { execFileSync } = require('node:child_process')
+const { statSync, rmdirSync } = require('node:fs')
+const { resolve } = require('node:path')
 
 describe('auth reporting credential boundary', () => {
   it('never emits synthetic credentials from titles, steps, errors, attachments or logs', () => {
@@ -25,6 +26,12 @@ describe('auth reporting credential boundary', () => {
   })
 
   it('isolates auth from HTML reporters, screenshots, videos and traces', () => {
+    // Playwright's ESM loader must run in Node, outside legacy Jest's VM.
+    const root = resolve(__dirname, '../../..')
+    const { config, baseConfig } = JSON.parse(execFileSync(process.execPath, ['-e', 'console.log(JSON.stringify({config:require("./playwright.auth.config"),baseConfig:require("./playwright.config")}))'], { cwd: root, encoding: 'utf8' }))
+    expect(statSync(config.outputDir).mode & 0o777).toBe(0o700)
+    rmdirSync(config.outputDir) // exact empty directory created by this config test
+    expect(config.preserveOutput).toBe('never')
     expect(baseConfig.projects.some(project => project.testMatch.includes('.auth.'))).toBe(false)
     expect(config.reporter).toHaveLength(1)
     expect(config.reporter[0][0]).toContain('auth-safe-reporter.cjs')
