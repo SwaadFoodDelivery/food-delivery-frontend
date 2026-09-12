@@ -9,6 +9,7 @@ on:
       - codex/onboarding-review-ui
       - codex/browser-e2e
       - codex/payment-retry-ui
+      - codex/persona-browser-acceptance
   push:
     branches:
       - main

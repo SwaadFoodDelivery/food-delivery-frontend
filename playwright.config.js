@@ -34,7 +34,7 @@ module.exports = defineConfig({
     env: {
       VUE_APP_API_BASE_URL: '/api/v1',
       VUE_APP_DEV_PROXY_TARGET: process.env.E2E_BACKEND_URL || 'http://127.0.0.1:8080',
-      VUE_APP_CLIENT_API_KEY: ''
+      VUE_APP_CLIENT_API_KEY: process.env.E2E_CLIENT_API_KEY || ''
     },
     stdout: 'ignore',
     stderr: 'pipe'
