@@ -74,7 +74,7 @@ test('browser OTP login, real uploads, rejection, replacement, resubmission and 
         uploads.push({ authorization: Boolean(request.headers().authorization), contentType: request.headers()['content-type'] })
       }
     })
-    async function upload(card, revision) {
+    const upload = async (card, revision) => {
       const confirmed = responseFor(applicant, '/onboarding/documents/uploaded')
       await card.locator('input[type="file"]').setInputFiles({ name: `fictional-demo-${revision}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from(`%PDF-1.4\nFictional test document ${revision}; not an identity document\n%%EOF`) })
       await card.getByRole('button', { name: 'Upload', exact: true }).click()
