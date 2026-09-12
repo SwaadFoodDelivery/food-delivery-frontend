@@ -79,13 +79,19 @@
             :key="document.document_id"
             :document="document"
             :is-uploading="onboarding.uploading[document.document_type] === true"
+            :replacing="onboarding.replacements[document.document_type] || ''"
             :disabled="isSubmitting"
             @upload="onUpload"
+            @replace="onboarding.beginReplacement(document.document_type)"
+            @cancel-replacement="onboarding.cancelReplacement(document.document_type)"
           />
         </ul>
 
         <p v-if="isClientRole && !detailsSaved" class="onboarding__gate-note">
           Save your details above to enable submission.
+        </p>
+        <p v-if="onboarding.hasUnfinishedReplacements" class="onboarding__gate-note" role="status">
+          Finish replacing your document before submitting. Before uploading, you can choose to keep the current document.
         </p>
 
         <AppButton
@@ -143,6 +149,7 @@ const hasUploadsInFlight = computed(() => Object.values(onboarding.uploading).so
 const canSubmit = computed(() =>
   onboarding.status === ONBOARDING_STATUS.DRAFT && !isSubmitting.value &&
   !isSavingDetails.value && !hasUploadsInFlight.value &&
+  !onboarding.hasUnfinishedReplacements &&
   onboarding.allDocumentsUploaded && (!isClientRole.value || detailsSaved.value)
 )
 

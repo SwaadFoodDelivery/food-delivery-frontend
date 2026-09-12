@@ -237,4 +237,41 @@ describe('onboarding store', () => {
     expect(store.documents).toEqual([])
     expect(store.isInitialised).toBe(false)
   })
+
+  it('blocks submission while a replacement is being selected, until explicitly discarded', async () => {
+    onboardingService.initOnboarding.mockResolvedValue({ ...initPayload, documents: initPayload.documents.map(doc => ({ ...doc, upload_status: UPLOAD_STATUS.UPLOADED })) })
+    const store = useOnboardingStore()
+    await store.start()
+    store.beginReplacement('driving_license')
+    expect(store.hasUnfinishedReplacements).toBe(true)
+    await expect(store.submit()).rejects.toThrow('Finish document uploads')
+    expect(onboardingService.submitOnboarding).not.toHaveBeenCalled()
+    store.cancelReplacement('driving_license')
+    expect(store.hasUnfinishedReplacements).toBe(false)
+    await store.submit()
+    expect(onboardingService.submitOnboarding).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['PUT', 'confirmation'])('failed replacement %s blocks old-document submission until successful retry', async (stage) => {
+    onboardingService.initOnboarding.mockResolvedValue({ ...initPayload, documents: initPayload.documents.map(doc => ({ ...doc, upload_status: UPLOAD_STATUS.UPLOADED })) })
+    uploadToPresignedUrl.mockResolvedValue()
+    onboardingService.markDocumentUploaded.mockResolvedValue({ updated: true })
+    if (stage === 'PUT') uploadToPresignedUrl.mockRejectedValueOnce(new Error('upload failed'))
+    else onboardingService.markDocumentUploaded.mockRejectedValueOnce(new Error('upload failed'))
+    const store = useOnboardingStore()
+    await store.start()
+    store.beginReplacement('driving_license')
+    const replacement = { documentType: 'driving_license', file: new File(['replacement'], 'new.pdf') }
+    await expect(store.uploadDocument(replacement)).rejects.toThrow('upload failed')
+    expect(store.allDocumentsUploaded).toBe(true) // historical metadata isn't the submit gate
+    expect(store.uploading.driving_license).toBe(false)
+    store.cancelReplacement('driving_license') // no discard after potentially overwriting storage
+    expect(store.replacements.driving_license).toBe('attempted')
+    await expect(store.submit()).rejects.toThrow('Finish document uploads')
+    expect(onboardingService.submitOnboarding).not.toHaveBeenCalled()
+    await store.uploadDocument(replacement)
+    expect(store.hasUnfinishedReplacements).toBe(false)
+    await store.submit()
+    expect(onboardingService.submitOnboarding).toHaveBeenCalledTimes(1)
+  })
 })

@@ -15,14 +15,24 @@ describe('DocumentUploadCard replacement', () => {
     const wrapper = mountCard()
     expect(wrapper.text()).toContain('old.pdf')
     await button(wrapper, 'Replace document').trigger('click')
+    expect(wrapper.emitted('replace')).toHaveLength(1)
+    await wrapper.setProps({ replacing: 'editing' })
     expect(wrapper.find('v-file-input-stub').exists()).toBe(true)
     expect(button(wrapper, 'Upload').attributes('disabled')).toBeDefined()
     await wrapper.setProps({ isUploading: true })
-    await wrapper.setProps({ isUploading: false }) // failed attempt retains editor
+    await wrapper.setProps({ isUploading: false, replacing: 'attempted' }) // failed attempt retains editor
     expect(wrapper.find('v-file-input-stub').exists()).toBe(true)
-    await wrapper.setProps({ document: { ...original, file_name: 'new.pdf' } })
+    expect(button(wrapper, 'Keep current document')).toBeUndefined()
+    await wrapper.setProps({ document: { ...original, file_name: 'new.pdf' }, replacing: '' })
     expect(wrapper.find('v-file-input-stub').exists()).toBe(false)
     expect(wrapper.text()).toContain('new.pdf')
+    wrapper.unmount()
+  })
+
+  it('allows explicit discard before an upload attempt', async () => {
+    const wrapper = mountCard({ replacing: 'editing' })
+    await button(wrapper, 'Keep current document').trigger('click')
+    expect(wrapper.emitted('cancel-replacement')).toHaveLength(1)
     wrapper.unmount()
   })
 

@@ -30,12 +30,14 @@
       >
         Upload
       </AppButton>
+      <AppButton v-if="replacing === 'editing'" variant="ghost" :disabled="disabled || isUploading" @click="emit('cancel-replacement')">Keep current document</AppButton>
+      <p v-if="replacing === 'attempted' && !isUploading" role="status">Replacement is not confirmed. Retry the upload before submitting.</p>
     </template>
 
     <p v-else class="doc-card__filename">
       {{ document.file_name || 'Document received' }}
     </p>
-    <AppButton v-if="isUploaded && !replacing" variant="ghost" :disabled="disabled || isUploading" @click="replacing = true">Replace document</AppButton>
+    <AppButton v-if="isUploaded && !replacing" variant="ghost" :disabled="disabled || isUploading" @click="emit('replace')">Replace document</AppButton>
   </li>
 </template>
 
@@ -49,17 +51,18 @@ import { documentMeta, isFileWithinSizeLimit } from '@/utils/onboarding'
 const props = defineProps({
   document: { type: Object, required: true },
   isUploading: { type: Boolean, default: false },
+  replacing: { type: String, default: '' },
   disabled: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['upload'])
+const emit = defineEmits(['upload', 'replace', 'cancel-replacement'])
 
 const file = ref(null)
 const error = ref('')
-const replacing = ref(false)
 // The store replaces the document object only after both PUT and confirmation
 // succeed. Failed replacements keep the editor visible for a retry.
-watch(() => props.document, () => { replacing.value = false; file.value = null })
+watch(() => props.document, () => { file.value = null; error.value = '' })
+watch(() => props.replacing, value => { if (!value) { file.value = null; error.value = '' } })
 
 const meta = computed(() => documentMeta(props.document.document_type))
 const isUploaded = computed(() => props.document.upload_status === UPLOAD_STATUS.UPLOADED)
