@@ -80,6 +80,8 @@ test('browser OTP login, real uploads, rejection, replacement, resubmission and 
       await card.getByRole('button', { name: 'Upload', exact: true }).click()
       await dataFrom(confirmed)
       await expect(card.getByText('Uploaded', { exact: true })).toBeVisible()
+      await expect(card.getByText(`fictional-demo-${revision}.pdf`, { exact: true })).toBeVisible()
+      await expect(card.locator('input[type="file"]')).toHaveCount(0)
     }
     const cards = applicant.locator('.doc-card')
     for (let i = 0; i < application.documents.length; i++) await upload(cards.nth(i), `initial-${i}`)

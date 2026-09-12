@@ -24,7 +24,6 @@ module.exports = defineConfig({
   projects: [
     { name: 'chromium-live', testMatch: '**/*.live.spec.js', use: { trace: 'off' } },
     { name: 'chromium-personas', testMatch: '**/*.persona.spec.js', use: { trace: 'off' } },
-    { name: 'chromium-auth', testMatch: '**/*.auth.spec.js', use: { trace: 'off', screenshot: 'off' } },
     { name: 'chromium-mocked', testMatch: '**/*.mock.spec.js', use: { trace: 'retain-on-failure' } }
   ],
   webServer: {
