@@ -42,8 +42,9 @@ export function payForOrder({ orderId, paymentToken = 'demo-token' }) {
   })
 }
 
-export function listOrders({ limit = 20 } = {}) {
-  return request(API_URLS.ORDERS, { authMode: AUTH_MODE.BEARER, query: { limit } })
+/** The continuation cursor is opaque; send it unchanged and omit it on page one. */
+export function listOrders({ limit = 20, cursor = '' } = {}) {
+  return request(API_URLS.ORDERS, { authMode: AUTH_MODE.BEARER, query: { limit, ...(cursor ? { cursor } : {}) } })
 }
 
 export function getOrderHistory(orderId) {
