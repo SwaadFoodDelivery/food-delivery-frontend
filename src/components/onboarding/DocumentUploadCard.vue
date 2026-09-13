@@ -7,7 +7,7 @@
 
     <p v-if="meta.hint" class="doc-card__hint">{{ meta.hint }}</p>
 
-    <template v-if="!isUploaded">
+    <template v-if="!isUploaded || replacing">
       <v-file-input
         :model-value="file"
         :label="`Choose ${meta.label.toLowerCase()}`"
@@ -30,16 +30,19 @@
       >
         Upload
       </AppButton>
+      <AppButton v-if="replacing === 'editing'" variant="ghost" :disabled="disabled || isUploading" @click="emit('cancel-replacement')">Keep current document</AppButton>
+      <p v-if="replacing === 'attempted' && !isUploading" role="status">Replacement is not confirmed. Retry the upload before submitting.</p>
     </template>
 
     <p v-else class="doc-card__filename">
       {{ document.file_name || 'Document received' }}
     </p>
+    <AppButton v-if="isUploaded && !replacing" variant="ghost" :disabled="disabled || isUploading" @click="emit('replace')">Replace document</AppButton>
   </li>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import AppButton from '@/components/common/AppButton.vue'
 import { ACCEPTED_FILE_TYPES, ONBOARDING_MESSAGES, UPLOAD_STATUS } from '@/constants/onboarding'
@@ -48,13 +51,18 @@ import { documentMeta, isFileWithinSizeLimit } from '@/utils/onboarding'
 const props = defineProps({
   document: { type: Object, required: true },
   isUploading: { type: Boolean, default: false },
+  replacing: { type: String, default: '' },
   disabled: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['upload'])
+const emit = defineEmits(['upload', 'replace', 'cancel-replacement'])
 
 const file = ref(null)
 const error = ref('')
+// The store replaces the document object only after both PUT and confirmation
+// succeed. Failed replacements keep the editor visible for a retry.
+watch(() => props.document, () => { file.value = null; error.value = '' })
+watch(() => props.replacing, value => { if (!value) { file.value = null; error.value = '' } })
 
 const meta = computed(() => documentMeta(props.document.document_type))
 const isUploaded = computed(() => props.document.upload_status === UPLOAD_STATUS.UPLOADED)

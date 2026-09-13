@@ -28,7 +28,58 @@ token-free JSON attachment are captured. No HTTP responses are intercepted;
 private 0600 sessions expire in two hours. Keep traces off. This is local role
 acceptance, not independent human/GitHub approval or login/upload coverage.
 
-## Install
+## Actual OTP login and document upload
+
+`npm run test:e2e:auth` is a separate real-backend acceptance project. Unlike the
+session-seeded suites, it creates only new fictional account/profile records:
+no JWTs, sessions, OTPs, onboarding applications or document metadata are seeded.
+It obtains credentials through browser login and uploads sample PDF bytes to
+local MinIO, followed by the authenticated backend upload confirmation.
+
+Use backend PR #17 (including its stacked dependencies), schema 29, and the
+private outbox setup in backend `docs/mock-otp-outbox.md`. Start the dedicated
+backend with `MOCK_OTP_OUTBOX_DIR=<existing-private-0700-directory> REDIS_DB=1`.
+Then, from this frontend checkout:
+
+```sh
+E2E_LOCAL_SEED=1 E2E_BACKEND_URL=http://127.0.0.1:18080 \
+E2E_PORT=4174 E2E_CLIENT_API_KEY=dev-client-api-key \
+E2E_OTP_OUTBOX='/absolute/private/outbox-directory' npm run test:e2e:auth
+```
+
+Replace the outbox path before running. The API key shown is only
+the dedicated launcher's harmless local demo value. Do not supply a production
+key to a frontend build. The guarded fixture helper only permits `swaad_e2e_*`
+databases and reserves a new private 0600 identity file before creating accounts.
+
+Coverage: incorrect OTP rejection, successful applicant and manager login,
+HttpOnly refresh cookie (not a JSON refresh token), draft initialization, missing
+document submit guard, actual storage PUTs without bearer headers, submission,
+pending route denial, manager rejection, applicant feedback, document replacement,
+resubmission, approval and driver access. Only SMS transport is mocked for auth;
+no app API responses are intercepted. Sample PDFs explicitly are not real identity
+documents, and approval is an application action, not a GitHub/human review.
+
+The test consumes only its matching outbox files. Interrupted runs can leave
+private outbox/identity files and disposable database/storage fixtures. Do not
+publish those artifacts. `playwright.auth.config.js` is deliberately separate from
+the HTML-reporting suites: its reporter emits counts only, discarding test titles,
+steps, errors and attachments that could contain OTP values. Trace, screenshot
+and video are disabled. Transient failure artifacts use a new private 0700
+temporary directory and `preserveOutput: 'never'`; an interrupted process may
+still leave that private directory for exact-path cleanup. Never override the
+auth reporter/output settings or publish private test artifacts.
+Each run sends two OTPs; normal route rate limits remain enforced. Legacy
+customer/persona seed helpers use Redis DB 0: do not run them against DB 1 without
+restarting the owned backend with the matching configuration. Registration,
+email verification, OTP expiry/resend and session renewal remain separate scopes.
+
+Replacement recovery is also covered with Chromium's actual offline mode: an
+unstarted replacement can explicitly keep the current document, but a failed PUT
+or storage confirmation blocks submission until retry succeeds. The test checks
+the new filename and closed editor, not merely the historical Uploaded badge.
+
+## Installation
 
 For a complete local run, use `E2E_LOCAL_SEED=1` with `E2E_BACKEND_URL`.
 It creates one fictional customer and private two-hour session per scenario in

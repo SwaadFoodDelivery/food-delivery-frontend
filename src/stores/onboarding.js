@@ -21,6 +21,10 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   const documents = ref([])
   /** document_type → true while its upload is in flight. */
   const uploading = ref({})
+  // Editing can be discarded before a PUT; an attempted PUT may have changed
+  // storage even if its response/confirmation failed, so it must be retried.
+  const replacements = ref({})
+  const hasUnfinishedReplacements = computed(() => Object.values(replacements.value).some(Boolean))
 
   const isInitialised = computed(() => Boolean(onboardingId.value))
 
@@ -53,6 +57,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     rejectionReason.value = ''
     documents.value = []
     uploading.value = {}
+    replacements.value = {}
   }
 
   function applyInitPayload(data) {
@@ -62,6 +67,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     rejectionReason.value = data?.rejection_reason || ''
     documents.value = Array.isArray(data?.documents) ? [...data.documents] : []
     uploading.value = {}
+    replacements.value = {}
   }
 
   /**
@@ -81,6 +87,17 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     uploading.value = { ...uploading.value, [documentType]: value }
   }
 
+  function beginReplacement(documentType) {
+    if (status.value !== ONBOARDING_STATUS.DRAFT || uploading.value[documentType] || replacements.value[documentType]) return
+    if (!documents.value.some(doc => doc.document_type === documentType && doc.upload_status === UPLOAD_STATUS.UPLOADED)) return
+    replacements.value = { ...replacements.value, [documentType]: 'editing' }
+  }
+
+  function cancelReplacement(documentType) {
+    if (uploading.value[documentType] || replacements.value[documentType] !== 'editing') return
+    replacements.value = { ...replacements.value, [documentType]: '' }
+  }
+
   /**
    * Uploads one document, then tells the backend the object landed.
    *
@@ -93,6 +110,10 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   async function uploadDocument({ documentType, file }) {
     const target = documents.value.find((doc) => doc.document_type === documentType)
     if (!target) return
+
+    if (target.upload_status === UPLOAD_STATUS.UPLOADED) {
+      replacements.value = { ...replacements.value, [documentType]: 'attempted' }
+    }
 
     setUploading(documentType, true)
     try {
@@ -109,6 +130,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
           ? { ...doc, upload_status: UPLOAD_STATUS.UPLOADED, file_name: file.name }
           : doc
       )
+      replacements.value = { ...replacements.value, [documentType]: '' }
     } finally {
       setUploading(documentType, false)
     }
@@ -119,6 +141,9 @@ export const useOnboardingStore = defineStore('onboarding', () => {
    * @returns {Promise<object>}
    */
   async function submit() {
+    if (hasUnfinishedReplacements.value || Object.values(uploading.value).some(Boolean)) {
+      throw new Error('Finish document uploads or cancel an unstarted replacement before submitting.')
+    }
     const data = await onboardingService.submitOnboarding({ onboardingId: onboardingId.value })
     status.value = data?.status || ONBOARDING_STATUS.PENDING_VERIFICATION
     return data
@@ -142,6 +167,10 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     rejectionReason,
     documents,
     uploading,
+    replacements,
+    hasUnfinishedReplacements,
+    beginReplacement,
+    cancelReplacement,
     isInitialised,
     uploadedCount,
     allDocumentsUploaded,
