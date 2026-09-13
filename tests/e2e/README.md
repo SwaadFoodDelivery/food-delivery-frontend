@@ -62,12 +62,22 @@ documents, and approval is an application action, not a GitHub/human review.
 
 The test consumes only its matching outbox files. Interrupted runs can leave
 private outbox/identity files and disposable database/storage fixtures. Do not
-publish those artifacts. Trace and automatic screenshots are disabled for this
-project; the report contains sanitized lifecycle IDs/counts, never OTPs or tokens.
+publish those artifacts. `playwright.auth.config.js` is deliberately separate from
+the HTML-reporting suites: its reporter emits counts only, discarding test titles,
+steps, errors and attachments that could contain OTP values. Trace, screenshot
+and video are disabled. Transient failure artifacts use a new private 0700
+temporary directory and `preserveOutput: 'never'`; an interrupted process may
+still leave that private directory for exact-path cleanup. Never override the
+auth reporter/output settings or publish private test artifacts.
 Each run sends two OTPs; normal route rate limits remain enforced. Legacy
 customer/persona seed helpers use Redis DB 0: do not run them against DB 1 without
 restarting the owned backend with the matching configuration. Registration,
 email verification, OTP expiry/resend and session renewal remain separate scopes.
+
+Replacement recovery is also covered with Chromium's actual offline mode: an
+unstarted replacement can explicitly keep the current document, but a failed PUT
+or storage confirmation blocks submission until retry succeeds. The test checks
+the new filename and closed editor, not merely the historical Uploaded badge.
 
 ## Installation
 
