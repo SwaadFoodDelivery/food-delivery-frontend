@@ -7,7 +7,7 @@
         <p class="history__subtext">A recipient-scoped view of your mock order and delivery history.</p>
       </div>
       <div class="history__actions">
-        <button type="button" class="history__back" :disabled="loading" :aria-busy="loading" @click="refresh">Refresh</button>
+        <button type="button" class="history__back" :disabled="loading || Boolean(cancellingKey)" :aria-busy="loading" @click="refresh">Refresh</button>
         <button type="button" class="history__back" @click="router.push({ name: ROUTE_NAMES.ORDER })">Order again</button>
       </div>
     </header>
@@ -36,7 +36,7 @@
     </section>
     <div class="history__pagination">
       <p ref="pageStatus" class="history__state" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">{{ pageMessage }}</p>
-      <button v-if="invalidCursor" ref="restartButton" type="button" class="history__back" :disabled="loading" @click="refresh">Restart from first page</button>
+      <button v-if="invalidCursor" ref="restartButton" type="button" class="history__back" :disabled="loading || Boolean(cancellingKey)" @click="refresh">Restart from first page</button>
       <button v-else-if="nextCursor" ref="moreButton" type="button" class="history__back" :disabled="loading || loadingMore" :aria-busy="loadingMore" @click="loadMore">Load older orders</button>
     </div>
   </main>
@@ -114,11 +114,12 @@ function label(value = '') { return value.replaceAll('_', ' ').replace(/\b\w/g, 
 function canCancel(order) { return !['cancelled', 'rejected', 'delivered'].includes(order.status) }
 
 async function refresh() {
-  if (loading.value || disposed) return
+  // A list read must not supersede a mutation whose outcome is still unknown.
+  if (loading.value || cancellingKey.value || disposed) return
+  const restartHadFocus = document.activeElement === restartButton.value
   const requestGeneration = ++generation
   loading.value = true
   loadingMore.value = false
-  cancellingKey.value = ''
   error.value = ''
   actionError.value = ''
   clearTimeline()
@@ -132,7 +133,15 @@ async function refresh() {
   } catch (caught) {
     if (isCurrent(requestGeneration)) error.value = caught?.message || 'Order history could not be loaded.'
   } finally {
-    if (isCurrent(requestGeneration)) loading.value = false
+    if (isCurrent(requestGeneration)) {
+      loading.value = false
+      await nextTick()
+      if (isCurrent(requestGeneration) && restartHadFocus && !invalidCursor.value && document.activeElement === document.body) {
+        // Successful restart removes its button. Keep keyboard users at the
+        // pagination controls unless they moved focus while the read was pending.
+        ;(moreButton.value || pageStatus.value)?.focus()
+      }
+    }
   }
 }
 

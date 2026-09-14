@@ -252,19 +252,70 @@ describe('OrderHistoryView pagination', () => {
     expect(button('Cancel demo order').element.disabled).toBe(false)
   })
 
-  it('guards duplicate cancellations and ignores completion after Refresh', async () => {
+  it.each([
+    ['Refresh', 'success'], ['Refresh', 'failure'],
+    ['Restart from first page', 'success'], ['Restart from first page', 'failure']
+  ])('blocks %s until pending cancellation resolves with %s', async (control, outcome) => {
     await open()
+    if (control === 'Restart from first page') {
+      listOrders.mockRejectedValueOnce({ status: 400 })
+      await click('Load older orders')
+    }
+    const listCallsBeforeCancel = listOrders.mock.calls.length
     const cancellation = deferred()
     cancelOrder.mockReturnValueOnce(cancellation.promise)
     await button('Cancel demo order').trigger('click')
     await button('Cancel demo order').trigger('click')
     expect(cancelOrder).toHaveBeenCalledTimes(1)
-    listOrders.mockResolvedValueOnce({ orders: [row('one')] })
-    await click('Refresh')
-    cancellation.resolve({})
+    expect(button('Refresh').element.disabled).toBe(true)
+    expect(button(control).element.disabled).toBe(true)
+    await click(control)
+    // Exercise the handler guard as well as the native disabled button.
+    await wrapper.vm.$.setupState.refresh()
+    expect(listOrders).toHaveBeenCalledTimes(listCallsBeforeCancel)
+    expect(button('Cancel demo order').element.disabled).toBe(true)
+    if (outcome === 'success') cancellation.resolve({})
+    else cancellation.reject(new Error('Cancellation unavailable'))
     await flushPromises()
-    expect(wrapper.text()).not.toContain('Cancelled')
-    expect(button('Cancel demo order').element.disabled).toBe(false)
+    expect(button(control).element.disabled).toBe(false)
+    if (outcome === 'success') {
+      expect(wrapper.text()).toContain('Cancelled')
+      expect(button('Cancel demo order')).toBeUndefined()
+    } else {
+      expect(wrapper.text()).toContain('Cancellation unavailable')
+      expect(button('Cancel demo order').element.disabled).toBe(false)
+    }
+    listOrders.mockResolvedValueOnce({ orders: [{ ...row('one'), status: outcome === 'success' ? 'cancelled' : 'order_created' }] })
+    await click(control)
+    expect(listOrders).toHaveBeenCalledTimes(listCallsBeforeCancel + 1)
+    expect(cancelOrder).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['', 'next-page'])('restores keyboard focus after successful restart with cursor=%s', async (cursor) => {
+    await open()
+    listOrders.mockRejectedValueOnce({ status: 400 })
+    await click('Load older orders')
+    button('Restart from first page').element.focus()
+    listOrders.mockResolvedValueOnce({ orders: [row('fresh')], next_cursor: cursor })
+    await click('Restart from first page')
+    expect(button('Restart from first page')).toBeUndefined()
+    expect(document.activeElement).toBe(cursor
+      ? button('Load older orders').element
+      : wrapper.find('[role="status"]').element)
+  })
+
+  it('does not steal focus moved elsewhere during a pending restart', async () => {
+    await open()
+    listOrders.mockRejectedValueOnce({ status: 400 })
+    await click('Load older orders')
+    const restart = deferred()
+    listOrders.mockReturnValueOnce(restart.promise)
+    button('Restart from first page').element.focus()
+    await button('Restart from first page').trigger('click')
+    button('Order again').element.focus()
+    restart.resolve({ orders: [row('fresh')], next_cursor: 'fresh-next' })
+    await flushPromises()
+    expect(document.activeElement).toBe(button('Order again').element)
   })
 
   it.each(['list', 'more', 'timeline', 'cancel'])('ignores pending %s results after unmount', async (operation) => {

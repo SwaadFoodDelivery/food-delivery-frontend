@@ -86,6 +86,23 @@ test('mocked transient failure retains rows and retries cursor; 400 requires exp
   expect(history.requests[3]).toEqual({ limit: '20' })
 })
 
+for (const nextCursor of ['', 'fresh-cursor']) {
+  test(`mocked keyboard restart restores focus for ${nextCursor ? 'continuable' : 'terminal'} page`, async ({ page, history }) => {
+    history.pages.push({ orders: [order('first')], next_cursor: 'expired' }, { failure: 400 }, { orders: [order('fresh')], next_cursor: nextCursor })
+    await page.goto('/orders/history')
+    await page.getByRole('button', { name: 'Load older orders' }).click()
+    const restart = page.getByRole('button', { name: 'Restart from first page' })
+    await expect(restart).toBeVisible()
+    await restart.focus()
+    await page.keyboard.press('Enter')
+    await expect(restart).toBeHidden()
+    await expect(page.getByRole('article').getByRole('heading')).toHaveText('Fictional kitchen fresh')
+    if (nextCursor) await expect(page.getByRole('button', { name: 'Load older orders' })).toBeFocused()
+    else await expect(page.getByRole('status')).toBeFocused()
+    expect(history.requests[2]).toEqual({ limit: '20' })
+  })
+}
+
 test('mocked delayed older response cannot overwrite Refresh or resurrect its cursor', async ({ page, history }) => {
   history.pages.push({ orders: [order('first')], next_cursor: 'old-cursor' })
   const hold = history.hold({ orders: [order('stale')], next_cursor: 'stale-cursor' })
